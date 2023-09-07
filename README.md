@@ -1,5 +1,5 @@
-### This is the artifact for my EPQ project on the evolution of lighting models in computer graphics
+### This is the artifact for my EPQ project on the evolution of lighting and rendering in computer graphics
 
-- It features implementations of the following models:
-  - Phong
-  - Blinn-Phong
+- It features implementations of the following systems:
+  - Phong shading
+  - Blinn-Phong shading
