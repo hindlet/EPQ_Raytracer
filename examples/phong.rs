@@ -12,20 +12,29 @@ fn main() {
     let uniform_allocator = create_uniform_buffer_allocator(vulkano_context.memory_allocator());
 
 
-    let sphere = gen_icosphere(1.0, Vector3::X * 3.0, [1.0, 1.0, 1.0, 1.0], 3);
-    let mut cube = Mesh::new(test_cube::COLOURED_VERTICES.to_vec(), test_cube::INDICES.to_vec());
-    cube.set_normals(test_cube::NORMALS.to_vec());
-    
-    let mut total_mesh = sphere;
-    total_mesh.add(cube);
+    let large_sphere = gen_icosphere(20.0, Vector3::Y * -20.0, [1.0, 1.0, 1.0, 1.0], 5);
+    let red_sphere = gen_icosphere(1.0, Vector3::X * -2.5 + Vector3::Y * 0.75, [1.0, 0.1, 0.1, 1.0], 3);
+    let blue_sphere = gen_icosphere(1.0, Vector3::X * 2.5 + Vector3::Y * 0.75, [0.1, 0.1, 1.0, 1.0], 3);
+    let green_sphere = gen_icosphere(1.0, Vector3::Y, [0.1, 1.0, 0.1, 1.0], 3);
+
+    let mut total_mesh = large_sphere;
+    total_mesh.add(red_sphere);
+    total_mesh.add(blue_sphere);
+    total_mesh.add(green_sphere);
     let (total_vertices, total_normals, total_indices) = total_mesh.components();
 
     let vertex_buffer = create_shader_data_buffer(total_vertices, &vulkano_context, BufferType::Vertex);
     let normal_buffer = create_shader_data_buffer(total_normals, &vulkano_context, BufferType::Normal);
     let index_buffer = create_shader_data_buffer(total_indices, &vulkano_context, BufferType::Index);
 
-    let light_buffer = get_light_buffer(&uniform_allocator, vec![Light{pos: [3, 2, 0].into(), strength: 0.3, colour: [1, 1, 1].into()}, Light{pos: [0, -2, 0].into(), strength: 0.7, colour: [0, 0, 1].into()}]);
+    let lights = vec![
+        Light{pos: [3, 2, 0].into(), strength: 0.3, colour: [1, 1, 1].into()}, // white
+        Light{pos: [0, 2, 0].into(), strength: 0.5, colour: [1, 0, 1].into()}, // purple
+        Light{pos: [-3, 5, 0].into(), strength: 0.8, colour: [0, 1, 1].into()}, // whatever blue + green is
+        Light{pos: [3.75, 0.0, 0.0].into(), strength: 0.7, colour: [0, 1, 0].into()}, // green
+    ];
 
+    let light_buffer = get_light_buffer(&uniform_allocator, lights);
 
     let mut gui = Vec::new();
 
