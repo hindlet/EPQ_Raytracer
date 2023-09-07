@@ -42,6 +42,8 @@ impl Default for fs::Light {
     }
 }
 
+const MAXLIGHTS: usize = 4; // make sure is synced with shader NR_Lights
+
 
 pub struct Light {
     pub pos: Vector3,
@@ -289,8 +291,8 @@ pub fn get_light_buffer(
     allocator: &SubbufferAllocator,
     lights: Vec<Light>
 ) -> Subbuffer<fs::LightData>{
-    let mut transformed_data: [Padded<fs::Light, 4>; 4] = [Padded(fs::Light::default()); 4];
-    for i in 0..4 {
+    let mut transformed_data: [Padded<fs::Light, 4>; MAXLIGHTS] = [Padded(fs::Light::default()); MAXLIGHTS];
+    for i in 0..MAXLIGHTS {
         if i >= lights.len() {break;}
         transformed_data[i] = Padded(fs::Light {
             position: lights[i].pos.into(),
