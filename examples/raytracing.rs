@@ -8,12 +8,12 @@ fn main() {
     let (mut event_loop, vulkano_context, mut vulkano_windows, window_ids, commands_allocator, descriptor_set_allocator) = get_general_graphics_data(vec![("Scene".to_string(), IMAGE_SIZE[0] as f32, IMAGE_SIZE[1] as f32, false)], gen_swapchain_func!(Format::B8G8R8A8_UNORM));
     let mut gui = Vec::new();
 
-    let mut camera = Camera::new(Some([2.0, 2.0, -5.0]), Some([1.0, 0.0, 0.0]), Some(10.0), None);
+    let mut camera = Camera::new(Some([2.0, 2.0, -5.0]), Some([-0.35, -0.35, 0.87]), None, None);
 
     let mut last_frame_time = Instant::now();
 
     let scene_window_id = window_ids[0];
-
+    
 
     let mut compute_pipeline = RayTracePipeine::new(
         &vulkano_context,
@@ -22,6 +22,13 @@ fn main() {
         IMAGE_SIZE
     );
     compute_pipeline.init_data(&vulkano_context, &camera, 1.0, 2.0);
+    compute_pipeline.update_spheres(&vulkano_context, vec![
+        ([0.0, -20.0, 0.0], 20.0),
+        ([2.5, 0.75, 0.0], 1.0),
+        ([-2.5, 0.75, 0.0], 1.0),
+        ([0.0, 1.0, 0.0], 1.0),
+    ]);
+    
 
     let graphics_pipeline = RenderPassOverFrame::new(
         &vulkano_context,

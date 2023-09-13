@@ -1,5 +1,3 @@
-use maths::Vector2;
-
 use super::*;
 
 mod raytrace_shader {
@@ -21,6 +19,7 @@ pub struct RayTracePipeine {
 
     ray_data: (Subbuffer<[raytrace_shader::Ray]>, u32),
     sphere_data: (Subbuffer<[raytrace_shader::Sphere]>, u32),
+    cam_pos: Vector3
 }
 
 
@@ -68,6 +67,7 @@ impl RayTracePipeine {
 
             ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
             sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
+            cam_pos: Vector3::ZERO
         }
     }
 
@@ -101,7 +101,7 @@ impl RayTracePipeine {
                 push_constant_ranges: vec![PushConstantRange {
                     stages: ShaderStages::COMPUTE,
                     offset: 0,
-                    size: size_of::<i32>() as u32
+                    size: (size_of::<i32>() * 2 + size_of::<f32>() * 3) as u32
                 }],
                 ..Default::default()
             }
@@ -155,6 +155,7 @@ impl RayTracePipeine {
 
         let num_rays = rays.len() as u32;
         self.ray_data = (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays);
+        self.cam_pos = camera.position;
     }
 
     pub fn update_spheres(
@@ -223,7 +224,9 @@ impl RayTracePipeine {
         let to_process = ((self.ray_data.1 - 1)as u32 / 64) * 64 + 64;
 
         let push_constants = raytrace_shader::PushConstants {
-            num_rays: self.ray_data.1 as i32
+            camera_pos: self.cam_pos.into(),
+            num_rays: self.ray_data.1 as i32,
+            num_spheres: self.sphere_data.1 as i32,
         };
 
 

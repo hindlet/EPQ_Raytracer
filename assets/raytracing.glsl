@@ -24,14 +24,34 @@ layout(set = 0, binding = 2) buffer Spheres {
 };
 
 layout(push_constant) uniform PushConstants {
+    vec3 camera_pos;
+
     int num_rays;
+    int num_spheres;
 } push_constants;
+
+const vec3 SPHERE_COLOUR = vec3(1.0);
+
+bool intersecting_sphere(Sphere s, Ray r, vec3 root_pos) {
+    vec3 l = root_pos - s.centre;
+    
+    float a = dot(vec3(r.dir.xyz), vec3(r.dir.xyz));
+    float b = 2 * dot(vec3(r.dir.xyz), l);
+    float c = dot(l, l) - s.radius * s.radius;
+    return b * b - 4 * a * c >= 0;
+}
 
 
 vec3 ray_colour(Ray r) {
     float a = 0.5*(r.dir.y + 1.0);
-    return (1.0-a)*vec3(1.0, 1.0, 1.0) + a*vec3(0.5, 0.7, 1.0);
-    // return vec3(0.0, 1.0, 0.0);
+    
+    for (int i = 0; i < push_constants.num_spheres; i++) {
+        if (intersecting_sphere(spheres[i], r, push_constants.camera_pos)) {
+            return vec3(1);
+        }
+    }
+    
+    return (1.0-a)*vec3(0.5, 0.7, 1.0) + a*vec3(0.0);
 }
 
 
