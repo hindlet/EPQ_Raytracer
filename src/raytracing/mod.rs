@@ -12,10 +12,14 @@ use graphics::all_vulkano::{
     format::Format,
     sync::GpuFuture,
     command_buffer::{CommandBufferUsage, AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, SecondaryAutoCommandBuffer, CommandBufferInheritanceInfo, RenderPassBeginInfo, SubpassContents},
-    pipeline::{Pipeline, PipelineBindPoint, graphics::{GraphicsPipeline, vertex_input::Vertex, viewport::{Viewport, ViewportState}, input_assembly::InputAssemblyState}},
+    pipeline::{Pipeline, PipelineBindPoint, graphics::{GraphicsPipeline, vertex_input::Vertex, viewport::{Viewport, ViewportState}, input_assembly::InputAssemblyState}, layout::{PipelineLayout, PipelineLayoutCreateInfo, PushConstantRange}},
     descriptor_set::PersistentDescriptorSet,
     buffer::BufferContents,
     render_pass::{Subpass, RenderPass, Framebuffer, FramebufferCreateInfo},
-    sampler::{Sampler, SamplerAddressMode, SamplerMipmapMode, SamplerCreateInfo, Filter}
+    sampler::{Sampler, SamplerAddressMode, SamplerMipmapMode, SamplerCreateInfo, Filter},
+    descriptor_set::layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo, DescriptorSetLayoutBinding, DescriptorType},
+    shader::ShaderStages
 };
 use graphics::all_vulkano_utils::renderer::{DeviceImageView, SwapchainImageView};
+use std::collections::BTreeMap;
+use std::mem::size_of;

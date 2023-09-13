@@ -32,12 +32,12 @@ impl RayTracePipeine {
         image_size: [u32; 2]
     ) -> Self {
 
-        let pipeline = ComputePipeline::new(
+        let pipeline = ComputePipeline::with_pipeline_layout(
             context.device().clone(),
             raytrace_shader::load(context.device().clone()).unwrap().entry_point("main").unwrap(),
             &(),
+            RayTracePipeine::get_pipeline_layout(context),
             None,
-            |_| {},
         ).unwrap();
         
         let image = StorageImage::general_purpose_image_view(
@@ -58,8 +58,6 @@ impl RayTracePipeine {
         };
         
 
-        println!("{:?}", pipeline.layout());
-
         RayTracePipeine {
             compute_queue: context.graphics_queue().clone(),
             compute_pipeline: pipeline,
@@ -71,6 +69,43 @@ impl RayTracePipeine {
             ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
             sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
         }
+    }
+
+    fn get_pipeline_layout(
+        context: &VulkanoContext
+    ) -> Arc<PipelineLayout> {
+
+        let mut bindings = BTreeMap::new();
+
+        bindings.insert(0, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageImage));
+        bindings.insert(1, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
+        bindings.insert(2, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
+
+        for binding in bindings.iter_mut() {
+            binding.1.stages = ShaderStages::COMPUTE;
+        }
+
+        let set_layout = DescriptorSetLayout::new(
+            context.device().clone(),
+            DescriptorSetLayoutCreateInfo {
+                bindings: bindings,
+                push_descriptor: false,
+                ..Default::default()
+            }
+        ).unwrap();
+
+
+        PipelineLayout::new(context.device().clone(),
+            PipelineLayoutCreateInfo {
+                set_layouts: vec![set_layout],
+                push_constant_ranges: vec![PushConstantRange {
+                    stages: ShaderStages::COMPUTE,
+                    offset: 0,
+                    size: size_of::<i32>() as u32
+                }],
+                ..Default::default()
+            }
+        ).unwrap()
     }
 
 
