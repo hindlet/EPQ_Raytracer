@@ -7,11 +7,20 @@ struct Ray {
     vec4 pos;
 };
 
+struct Sphere {
+    vec3 centre;
+    float radius;
+};
+
 layout(set = 0, binding = 0, rgba8) uniform image2D img;
 
 
 layout(set = 0, binding = 1) buffer Rays {
     Ray[] rays;
+};
+
+layout(set = 0, binding = 2) buffer Spheres {
+    Sphere[] spheres;
 };
 
 layout(push_constant) uniform PushConstants {

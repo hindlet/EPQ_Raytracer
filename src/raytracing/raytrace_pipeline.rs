@@ -19,7 +19,8 @@ pub struct RayTracePipeine {
     image: DeviceImageView,
     image_size: [u32; 2],
 
-    rays: Option<Subbuffer<[raytrace_shader::Ray]>>,
+    ray_data: (Subbuffer<[raytrace_shader::Ray]>, u32),
+    sphere_data: (Subbuffer<[raytrace_shader::Sphere]>, u32),
 }
 
 
@@ -47,6 +48,18 @@ impl RayTracePipeine {
             ImageUsage::SAMPLED | ImageUsage::STORAGE | ImageUsage::TRANSFER_DST,
         ).unwrap();
 
+        let null_ray = raytrace_shader::Ray {
+            pos: [0.0, 0.0, 0.0, 0.0],
+            dir: [0.0, 0.0, 0.0, 0.0]
+        };
+        let null_sphere = raytrace_shader::Sphere {
+            centre: [0.0, 0.0, 0.0],
+            radius: 0.0
+        };
+        
+
+        println!("{:?}", pipeline.layout());
+
         RayTracePipeine {
             compute_queue: context.graphics_queue().clone(),
             compute_pipeline: pipeline,
@@ -54,7 +67,9 @@ impl RayTracePipeine {
             descriptor_set_allocator: descriptor_set_allocator.clone(),
             image: image,
             image_size: image_size,
-            rays: None,
+
+            ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
+            sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
         }
     }
 
@@ -103,9 +118,26 @@ impl RayTracePipeine {
             });
         }
 
-        
+        let num_rays = rays.len() as u32;
+        self.ray_data = (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays);
+    }
 
-        self.rays = Some(create_shader_data_buffer(rays, context, BufferType::Storage));
+    pub fn update_spheres(
+        &mut self,
+        context: &VulkanoContext,
+        sphere_data: Vec<([f32; 3], f32)>
+    ) {
+        let mut spheres: Vec<raytrace_shader::Sphere> = Vec::new();
+
+        for datum in sphere_data.iter() {
+            spheres.push(raytrace_shader::Sphere {
+                centre: datum.0,
+                radius: datum.1
+            });
+        }
+
+        let num_spheres = spheres.len() as u32;
+        self.sphere_data = (create_shader_data_buffer(spheres, context, BufferType::Storage), num_spheres);
     }
 
     pub fn compute(
@@ -147,16 +179,16 @@ impl RayTracePipeine {
             desc_layout.clone(),
             [
                 WriteDescriptorSet::image_view(0, self.image.clone()),
-                WriteDescriptorSet::buffer(1, self.rays.clone().unwrap()),
+                WriteDescriptorSet::buffer(1, self.ray_data.0.clone()),
+                WriteDescriptorSet::buffer(2, self.sphere_data.0.clone())
             ],
         )
         .unwrap();
         
-        let num_rays = (self.image_size[0] * self.image_size[1]) as i32;
-        let to_process = ((num_rays - 1)as u32 / 64) * 64 + 64;
+        let to_process = ((self.ray_data.1 - 1)as u32 / 64) * 64 + 64;
 
         let push_constants = raytrace_shader::PushConstants {
-            num_rays: num_rays
+            num_rays: self.ray_data.1 as i32
         };
 
 
