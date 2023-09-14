@@ -51,7 +51,7 @@ vec3 ray_colour(Ray r) {
         }
     }
     
-    return (1.0-a)*vec3(0.5, 0.7, 1.0) + a*vec3(0.0);
+    return (1.0-a)*vec3(0.0) + a*vec3(0.5, 0.7, 1.0);
 }
 
 
