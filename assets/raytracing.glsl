@@ -1,4 +1,5 @@
 #version 460
+#define FLT_MAX 3.402823466e+38
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -59,11 +60,15 @@ vec4 intersecting_sphere(Sphere s, Ray r) {
 vec3 ray_colour(Ray r) {
     
     // sphere intersections
+    vec4 closest = vec4(0, 0, 0, FLT_MAX);
     for (int i = 0; i < push_constants.num_spheres; i++) {
         vec4 hit_info = intersecting_sphere(spheres[i], r);
-        if (hit_info.w >= 0.0) {
-            return 0.5*vec3(hit_info.x+1, hit_info.y+1, hit_info.z+1);
+        if (hit_info.w >= 0.0 && hit_info.w < closest.w) {
+            closest = hit_info;
         }
+    }
+   if (closest.w != FLT_MAX) {
+        return 0.5*vec3(closest.x+1, closest.y+1, closest.z+1);
     }
     
     float a = 0.5*(r.dir.y + 1.0);

@@ -23,9 +23,9 @@ fn main() {
     );
     compute_pipeline.init_data(&vulkano_context, &camera, 1.0, 2.0);
     compute_pipeline.update_spheres(&vulkano_context, vec![
-        // ([0.0, -20.0, 0.0], 20.0),
-        // ([2.5, 0.75, 0.0], 1.0),
-        // ([-2.5, 0.75, 0.0], 1.0),
+        ([0.0, -20.0, 0.0], 20.0),
+        ([2.5, 0.75, 0.0], 1.0),
+        ([-2.5, 0.75, 0.0], 1.0),
         ([0.0, 1.0, 0.0], 1.0),
     ]);
     
