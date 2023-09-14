@@ -8,7 +8,7 @@ use lighting_models::{gen_icosphere, blinn_phong::*};
 
 fn main() {
 
-    let (mut event_loop, vulkano_context, mut vulkano_windows, window_ids, commands_allocator, descriptor_set_allocator) = get_general_graphics_data(vec![("Scene".to_string(), 1500.0, 1000.0, false)], gen_swapchain_func!(Format::R8G8B8A8_UNORM));
+    let (mut event_loop, vulkano_context, mut vulkano_windows, window_ids, commands_allocator, descriptor_set_allocator) = get_general_graphics_data(vec![("Scene".to_string(), 1500.0, 1000.0, false)], gen_swapchain_func!(Format::B8G8R8A8_SRGB));
     let uniform_allocator = create_uniform_buffer_allocator(vulkano_context.memory_allocator());
 
     let large_sphere = gen_icosphere(20.0, Vector3::Y * -20.0, [1.0, 1.0, 1.0, 1.0], 5);
