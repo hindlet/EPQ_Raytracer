@@ -1,3 +1,5 @@
+use maths::{Vector3, Matrix3};
+
 use super::*;
 
 mod raytrace_shader {
@@ -47,7 +49,6 @@ impl RayTracePipeine {
         ).unwrap();
 
         let null_ray = raytrace_shader::Ray {
-            origin: [0.0, 0.0, 0.0, 0.0],
             dir: [0.0, 0.0, 0.0, 0.0],
             img_pos: [0.0, 0.0, 0.0, 0.0]
         };
@@ -93,6 +94,13 @@ impl RayTracePipeine {
             }
         ).unwrap();
 
+        let push_const_size = 
+            size_of::<f32>() * 3 +
+            size_of::<i32>() * 1 +
+            size_of::<i32>() + 12 +
+            (size_of::<f32>() * 3 + 4) * 3
+        ;
+
 
         PipelineLayout::new(context.device().clone(),
             PipelineLayoutCreateInfo {
@@ -100,7 +108,7 @@ impl RayTracePipeine {
                 push_constant_ranges: vec![PushConstantRange {
                     stages: ShaderStages::COMPUTE,
                     offset: 0,
-                    size: (size_of::<i32>() * 2) as u32
+                    size: push_const_size as u32
                 }],
                 ..Default::default()
             }
@@ -112,33 +120,32 @@ impl RayTracePipeine {
         self.image.clone()
     }
 
-    /// this assumes a fixed camera, if not the data would need to be updated
+    /// TODO: Have rays relative to dir (1, 0, 0) and then transform in shader from cam dir
     pub fn init_data(
         &mut self,
         context: &VulkanoContext,
-        camera: &Camera,
         camera_focal_length: f32,
         viewport_height: f32,
+        up: impl Into<Vector3>
     ) {
         let viewport_width = viewport_height * (self.image_size[0] as f32 / self.image_size[1] as f32);
 
-        let viewport_x = camera.up.cross(camera.direction).normalised();
-        let viewport_y = viewport_x.cross(camera.direction).normalised();
-        let viewport_upper_left = camera.position + camera.direction * camera_focal_length - (viewport_x * viewport_width - viewport_y * viewport_height) * 0.5;
+        let viewport_x = up.into().cross(Vector3::X).normalised();
+        let viewport_y = viewport_x.cross(Vector3::X).normalised();
+        let viewport_upper_left = Vector3::ZERO + Vector3::X * camera_focal_length - (viewport_x * viewport_width - viewport_y * viewport_height) * 0.5;
 
         let pixel_x = viewport_x * viewport_width / self.image_size[0] as f32;
         let pixel_y = viewport_y * viewport_height / self.image_size[1] as f32;
 
         let first_ray = viewport_upper_left + (pixel_x - pixel_y) * 0.5;
-        let mut ray_data: Vec<([f32; 4], [f32; 4], [f32; 4])> = Vec::new();
+        let mut ray_data: Vec<([f32; 4], [f32; 4])> = Vec::new();
 
         for y in 0..self.image_size[1] {
             for x in 0..self.image_size[0] {
                 let ray_pos = first_ray + pixel_x * x as f32 - pixel_y * y as f32;
                 ray_data.push((
                     Vector2::new(x as f32, (self.image_size[1] - y) as f32).extend().extend().into(),
-                    ((ray_pos - camera.position)).normalised().extend().into(),
-                    camera.position.extend().into()
+                    ((ray_pos - Vector3::ZERO)).normalised().extend().into(),
                 ));
             }
         }
@@ -150,7 +157,6 @@ impl RayTracePipeine {
             rays.push(raytrace_shader::Ray {
                 img_pos: datum.0,
                 dir: datum.1,
-                origin: datum.2
             });
         }
 
@@ -178,7 +184,8 @@ impl RayTracePipeine {
 
     pub fn compute(
         &mut self,
-        before_future: Box<dyn GpuFuture>
+        before_future: Box<dyn GpuFuture>,
+        camera: &Camera
     ) -> Box<dyn GpuFuture> {
 
         let mut builder = AutoCommandBufferBuilder::primary(
@@ -187,7 +194,7 @@ impl RayTracePipeine {
             CommandBufferUsage::OneTimeSubmit,
         ).unwrap();
 
-        self.dispatch(&mut builder);
+        self.dispatch(&mut builder, camera);
 
 
         let command_buffer = builder.build().unwrap();
@@ -207,6 +214,7 @@ impl RayTracePipeine {
         builder: &mut AutoCommandBufferBuilder<
         PrimaryAutoCommandBuffer,
         Arc<StandardCommandBufferAllocator>>,
+        camera: &Camera,
     ) {
         let pipeline_layout = self.compute_pipeline.layout();
         let desc_layout = pipeline_layout.set_layouts().get(0).unwrap();
@@ -223,9 +231,23 @@ impl RayTracePipeine {
         
         let to_process = ((self.ray_data.1 - 1)as u32 / 64) * 64 + 64;
 
+        let allignment_mat = {
+            let rotation_axis = camera.direction.cross(Vector3::X);
+            let rotation_angle = Vector3::X.angle_to(camera.direction);
+            Matrix3::from_angle_and_axis(-rotation_angle, rotation_axis.normalised())
+        };
+        // println!("{:?}", allignment_mat);
+        let padded_allignment_mat: [Padded<[f32; 3], 4>; 3] = [
+            Padded(allignment_mat.x.into()),
+            Padded(allignment_mat.y.into()),
+            Padded(allignment_mat.z.into())
+        ];
+
         let push_constants = raytrace_shader::PushConstants {
+            cam_pos: camera.position.into(),
             num_rays: self.ray_data.1 as i32,
-            num_spheres: self.sphere_data.1 as i32,
+            num_spheres: Padded(self.sphere_data.1 as i32),
+            cam_alignment_mat: padded_allignment_mat,
         };
 
 

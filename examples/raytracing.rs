@@ -21,7 +21,7 @@ fn main() {
         &descriptor_set_allocator,
         IMAGE_SIZE
     );
-    compute_pipeline.init_data(&vulkano_context, &camera, 1.0, 2.0);
+    compute_pipeline.init_data(&vulkano_context, 1.0, 2.0, camera.up);
     compute_pipeline.update_spheres(&vulkano_context, vec![
         ([0.0, -20.0, 0.0], 20.0),
         ([2.5, 0.75, 0.0], 1.0),
@@ -46,7 +46,7 @@ fn main() {
 
             let renderer = vulkano_windows.get_renderer_mut(scene_window_id).unwrap();
             let before_compute = renderer.acquire().unwrap();
-            let after_compute = compute_pipeline.compute(before_compute);
+            let after_compute = compute_pipeline.compute(before_compute, &camera);
             let after_render = graphics_pipeline.render(after_compute, compute_pipeline.image(), renderer.swapchain_image_view());
             renderer.present(after_render, true);
 

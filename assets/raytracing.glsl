@@ -3,20 +3,19 @@
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
+
+
 struct Ray {
-    vec4 origin;
-    vec4 dir;
+    vec4 dir; // relative to line (1, 0, 0)
     vec4 img_pos;
 };
 
-vec3 ray_at(Ray r, float dist) {
-    return vec3(r.origin) + vec3(r.dir) * dist;
-}
 
 struct Sphere {
     vec3 centre;
     float radius;
 };
+
 
 layout(set = 0, binding = 0, rgba8) uniform image2D img;
 
@@ -30,18 +29,26 @@ layout(set = 0, binding = 2) buffer Spheres {
 };
 
 layout(push_constant) uniform PushConstants {
+    vec3 cam_pos;
     int num_rays;
     int num_spheres;
+    mat3 cam_alignment_mat;
 } push_constants;
 
-const vec3 SPHERE_COLOUR = vec3(1.0);
+
+vec3 ray_at(Ray r, float dist) {
+    return push_constants.cam_pos + (vec3(r.dir) * push_constants.cam_alignment_mat) * dist;
+}
+
 
 // output: (normal, hit_dist)
 vec4 intersecting_sphere(Sphere s, Ray r) {
-    vec3 l = vec3(r.origin) - s.centre;
+    vec3 l = push_constants.cam_pos - s.centre;
+
+    vec3 dir = vec3(r.dir) * push_constants.cam_alignment_mat;
     
-    float a = dot(vec3(r.dir), vec3(r.dir));
-    float half_b = dot(vec3(r.dir), l);
+    float a = dot(dir, dir);
+    float half_b = dot(dir, l);
     float c = dot(l, l) - s.radius * s.radius;
     float discriminant = half_b * half_b - a * c;
 
@@ -71,7 +78,7 @@ vec3 ray_colour(Ray r) {
         return 0.5*vec3(closest.x+1, closest.y+1, closest.z+1);
     }
     
-    float a = 0.5*(r.dir.y + 1.0);
+    float a = 0.5*((vec3(r.dir) * push_constants.cam_alignment_mat).y + 1.0);
     return (1.0-a)*vec3(0.0) + a*vec3(0.5, 0.7, 1.0);
 }
 
