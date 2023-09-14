@@ -126,6 +126,7 @@ impl RayTracePipeine {
         let viewport_x = camera.up.cross(camera.direction).normalised();
         let viewport_y = viewport_x.cross(camera.direction).normalised();
         let viewport_upper_left = camera.position + camera.direction * camera_focal_length - (viewport_x * viewport_width - viewport_y * viewport_height) * 0.5;
+        println!("{:?}", viewport_upper_left);
 
         let pixel_x = viewport_x * viewport_width / self.image_size[0] as f32;
         let pixel_y = viewport_y * viewport_height / self.image_size[1] as f32;
@@ -137,11 +138,13 @@ impl RayTracePipeine {
             for x in 0..self.image_size[0] {
                 let ray_pos = first_ray + pixel_x * x as f32 - pixel_y * y as f32;
                 ray_data.push((
-                    Vector2::new(x as f32, y as f32).extend().extend().into(),
-                    (ray_pos - camera.position).normalised().extend().into()
+                    Vector2::new(x as f32, (self.image_size[1] - y) as f32).extend().extend().into(),
+                    ((ray_pos - camera.position)).normalised().extend().into()
                 ));
             }
         }
+        println!("{:?}", ray_data[0]);
+        println!("{:?}", ray_data[ray_data.len() - 1]);
 
 
         let mut rays: Vec<raytrace_shader::Ray> = Vec::new();
