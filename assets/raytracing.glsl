@@ -35,7 +35,8 @@ layout(push_constant) uniform PushConstants {
 
 const vec3 SPHERE_COLOUR = vec3(1.0);
 
-float intersecting_sphere(Sphere s, Ray r) {
+// output: (normal, hit_dist)
+vec4 intersecting_sphere(Sphere s, Ray r) {
     vec3 l = vec3(r.origin) - s.centre;
     
     float a = dot(vec3(r.dir), vec3(r.dir));
@@ -44,9 +45,13 @@ float intersecting_sphere(Sphere s, Ray r) {
     float discriminant = half_b * half_b - a * c;
 
     if (discriminant >= 0) {
-        return (-half_b - sqrt(discriminant)) / a;
+        float dist = (-half_b - sqrt(discriminant)) / a;
+        return vec4(
+            ray_at(r, dist) - s.centre,
+            dist
+        );
     } else {
-        return -1;
+        return vec4(-1);
     }
 }
 
@@ -55,9 +60,9 @@ vec3 ray_colour(Ray r) {
     
     // sphere intersections
     for (int i = 0; i < push_constants.num_spheres; i++) {
-        float dist = intersecting_sphere(spheres[i], r);
-        if (dist >= 0.0) {
-            return vec3(1);
+        vec4 hit_info = intersecting_sphere(spheres[i], r);
+        if (hit_info.w >= 0.0) {
+            return 0.5*vec3(hit_info.x+1, hit_info.y+1, hit_info.z+1);
         }
     }
     
