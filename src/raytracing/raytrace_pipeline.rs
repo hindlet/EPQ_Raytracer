@@ -1,5 +1,4 @@
 use maths::{Vector3, Matrix3, Vector4};
-use std::f32::consts::PI;
 use super::*;
 
 mod raytrace_shader {
@@ -18,6 +17,7 @@ pub struct RayTracePipeine {
     descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
     image: DeviceImageView,
     image_size: [u32; 2],
+    pixel_dims: [f32; 2],
 
     ray_data: (Subbuffer<[raytrace_shader::Ray]>, u32),
     sphere_data: (Subbuffer<[raytrace_shader::Sphere]>, u32),
@@ -49,7 +49,7 @@ impl RayTracePipeine {
         ).unwrap();
 
         let null_ray = raytrace_shader::Ray {
-            dir: [0.0, 0.0, 0.0, 0.0],
+            sample_centre: [0.0, 0.0, 0.0, 0.0],
             img_pos: [0.0, 0.0, 0.0, 0.0]
         };
         let null_sphere = raytrace_shader::Sphere {
@@ -65,6 +65,7 @@ impl RayTracePipeine {
             descriptor_set_allocator: descriptor_set_allocator.clone(),
             image: image,
             image_size: image_size,
+            pixel_dims: [0.0, 0.0],
 
             ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
             sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
@@ -95,9 +96,12 @@ impl RayTracePipeine {
         ).unwrap();
 
         let push_const_size = 
-            size_of::<f32>() * 4 +
-            size_of::<i32>() * 2 +
-            size_of::<f32>() * 16
+            size_of::<f32>() * 4 + // cam poss
+            size_of::<f32>() * 16 + // cam allignment mat
+            size_of::<f32>() * 4 + // pixel dims
+            size_of::<i32>() + // num_rays;
+            size_of::<i32>() + // num_spheres;
+            size_of::<i32>()  // num_samples;
         ;
 
 
@@ -147,7 +151,7 @@ impl RayTracePipeine {
                 }
                 ray_data.push((
                     Vector2::new(x as f32, (self.image_size[1] - y) as f32).extend().extend().into(),
-                    ((ray_pos - Vector3::ZERO)).normalised().extend().into(),
+                    ray_pos.extend().into(),
                 ));
             }
         }
@@ -158,12 +162,13 @@ impl RayTracePipeine {
             // println!("{:?}", datum.1);
             rays.push(raytrace_shader::Ray {
                 img_pos: datum.0,
-                dir: datum.1,
+                sample_centre: datum.1,
             });
         }
 
         let num_rays = rays.len() as u32;
         self.ray_data = (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays);
+        self.pixel_dims = [viewport_width / self.image_size[0] as f32, viewport_width / self.image_size[1] as f32];
     }
 
     pub fn update_spheres(
@@ -238,7 +243,8 @@ impl RayTracePipeine {
             cam_alignment_mat: self.get_view_matrix(camera),
             num_rays: self.ray_data.1 as i32,
             num_spheres: self.sphere_data.1 as i32,
-            
+            num_samples: 10,
+            pixel_dims: [self.pixel_dims[0], self.pixel_dims[1], 0.0, 0.0]
         };
 
 
