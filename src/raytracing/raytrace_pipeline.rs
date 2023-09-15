@@ -1,5 +1,5 @@
-use maths::{Vector3, Matrix3};
-
+use maths::{Vector3, Matrix3, Vector4};
+use std::f32::consts::PI;
 use super::*;
 
 mod raytrace_shader {
@@ -95,10 +95,9 @@ impl RayTracePipeine {
         ).unwrap();
 
         let push_const_size = 
-            size_of::<f32>() * 3 +
-            size_of::<i32>() * 1 +
-            size_of::<i32>() + 12 +
-            (size_of::<f32>() * 3 + 4) * 3
+            size_of::<f32>() * 4 +
+            size_of::<i32>() * 2 +
+            size_of::<f32>() * 16
         ;
 
 
@@ -143,6 +142,9 @@ impl RayTracePipeine {
         for y in 0..self.image_size[1] {
             for x in 0..self.image_size[0] {
                 let ray_pos = first_ray + pixel_x * x as f32 - pixel_y * y as f32;
+                if (x == 0 && y == 0) || (x == self.image_size[0] - 1 && y == 0) || (x == 0 && y == self.image_size[1] - 1) || (x == self.image_size[0] - 1 && y == self.image_size[1] - 1) {
+                    println!("{:?}", ray_pos);
+                }
                 ray_data.push((
                     Vector2::new(x as f32, (self.image_size[1] - y) as f32).extend().extend().into(),
                     ((ray_pos - Vector3::ZERO)).normalised().extend().into(),
@@ -231,23 +233,27 @@ impl RayTracePipeine {
         
         let to_process = ((self.ray_data.1 - 1)as u32 / 64) * 64 + 64;
 
-        let allignment_mat = {
-            let rotation_axis = camera.direction.cross(Vector3::X);
-            let rotation_angle = Vector3::X.angle_to(camera.direction);
-            Matrix3::from_angle_and_axis(-rotation_angle, rotation_axis.normalised())
-        };
-        // println!("{:?}", allignment_mat);
-        let padded_allignment_mat: [Padded<[f32; 3], 4>; 3] = [
-            Padded(allignment_mat.x.into()),
-            Padded(allignment_mat.y.into()),
-            Padded(allignment_mat.z.into())
+        let new_x = camera.direction.normalised();
+        let new_z = -camera.direction.cross(camera.up).normalised();
+        let new_y = -new_x.cross(new_z).normalised();
+
+        let allignment_mat = Matrix3::from_columns(new_x, new_y, new_z).transposed();
+        // let test_mat_1 = Matrix3::from_columns([1.0, 1.0, -1.332], [1.0, 1.0, 1.332], [1.0, -1.0, -1.332]);
+        // let test_mat_2 = Matrix3::from_columns([1.0, -1.0, 1.332], [1, 0, 0], [0, 0, 0]);
+        // println!("{} \n{} \n{} \n", allignment_mat, allignment_mat * test_mat_1, allignment_mat * test_mat_2);
+        let padded_allignment_mat: [[f32; 4]; 4] = [
+            allignment_mat.x.extend().into(),
+            allignment_mat.y.extend().into(),
+            allignment_mat.z.extend().into(),
+            Vector4::W.into(),
         ];
 
         let push_constants = raytrace_shader::PushConstants {
-            cam_pos: camera.position.into(),
-            num_rays: self.ray_data.1 as i32,
-            num_spheres: Padded(self.sphere_data.1 as i32),
+            cam_pos: camera.position.extend().into(),
             cam_alignment_mat: padded_allignment_mat,
+            num_rays: self.ray_data.1 as i32,
+            num_spheres: self.sphere_data.1 as i32,
+            
         };
 
 
@@ -258,4 +264,12 @@ impl RayTracePipeine {
             .dispatch([to_process / 64, 1, 1])
             .unwrap();
     }
+
+    fn get_view_matrix(
+        &self,
+        camera: &Camera,
+    ) {
+
+    }
 }
+

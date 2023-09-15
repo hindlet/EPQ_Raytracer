@@ -29,23 +29,21 @@ layout(set = 0, binding = 2) buffer Spheres {
 };
 
 layout(push_constant) uniform PushConstants {
-    vec3 cam_pos;
+    vec4 cam_pos;
+    mat4 cam_alignment_mat;
     int num_rays;
     int num_spheres;
-    mat3 cam_alignment_mat;
 } push_constants;
 
 
-vec3 ray_at(Ray r, float dist) {
-    return push_constants.cam_pos + (vec3(r.dir) * push_constants.cam_alignment_mat) * dist;
+vec3 ray_at(vec3 root_pos, vec3 dir, float dist) {
+    return root_pos + dir * dist;
 }
 
 
 // output: (normal, hit_dist)
-vec4 intersecting_sphere(Sphere s, Ray r) {
-    vec3 l = push_constants.cam_pos - s.centre;
-
-    vec3 dir = vec3(r.dir) * push_constants.cam_alignment_mat;
+vec4 intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
+    vec3 l = root_pos - s.centre;
     
     float a = dot(dir, dir);
     float half_b = dot(dir, l);
@@ -55,7 +53,7 @@ vec4 intersecting_sphere(Sphere s, Ray r) {
     if (discriminant >= 0) {
         float dist = (-half_b - sqrt(discriminant)) / a;
         return vec4(
-            ray_at(r, dist) - s.centre,
+            ray_at(root_pos, dir, dist) - s.centre,
             dist
         );
     } else {
@@ -64,12 +62,12 @@ vec4 intersecting_sphere(Sphere s, Ray r) {
 }
 
 
-vec3 ray_colour(Ray r) {
+vec3 ray_colour(vec3 root_pos, vec3 dir) {
     
     // sphere intersections
     vec4 closest = vec4(0, 0, 0, FLT_MAX);
     for (int i = 0; i < push_constants.num_spheres; i++) {
-        vec4 hit_info = intersecting_sphere(spheres[i], r);
+        vec4 hit_info = intersecting_sphere(spheres[i], root_pos, dir);
         if (hit_info.w >= 0.0 && hit_info.w < closest.w) {
             closest = hit_info;
         }
@@ -78,7 +76,7 @@ vec3 ray_colour(Ray r) {
         return 0.5*vec3(closest.x+1, closest.y+1, closest.z+1);
     }
     
-    float a = 0.5*((vec3(r.dir) * push_constants.cam_alignment_mat).y + 1.0);
+    float a = 0.5*(dir.y + 1.0);
     return (1.0-a)*vec3(0.0) + a*vec3(0.5, 0.7, 1.0);
 }
 
@@ -90,7 +88,8 @@ void main() {
         return;
     }
 
+    vec3 dir = mat3(push_constants.cam_alignment_mat) * vec3(rays[id].dir);
 
-    vec3 colour = ray_colour(rays[id]);
+    vec3 colour = ray_colour(vec3(push_constants.cam_pos), dir);
     imageStore(img, ivec2(rays[id].img_pos.xy), vec4(colour, 1.0));
 }
