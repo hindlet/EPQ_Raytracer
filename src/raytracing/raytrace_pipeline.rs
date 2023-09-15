@@ -233,24 +233,9 @@ impl RayTracePipeine {
         
         let to_process = ((self.ray_data.1 - 1)as u32 / 64) * 64 + 64;
 
-        let new_x = camera.direction.normalised();
-        let new_z = -camera.direction.cross(camera.up).normalised();
-        let new_y = -new_x.cross(new_z).normalised();
-
-        let allignment_mat = Matrix3::from_columns(new_x, new_y, new_z).transposed();
-        // let test_mat_1 = Matrix3::from_columns([1.0, 1.0, -1.332], [1.0, 1.0, 1.332], [1.0, -1.0, -1.332]);
-        // let test_mat_2 = Matrix3::from_columns([1.0, -1.0, 1.332], [1, 0, 0], [0, 0, 0]);
-        // println!("{} \n{} \n{} \n", allignment_mat, allignment_mat * test_mat_1, allignment_mat * test_mat_2);
-        let padded_allignment_mat: [[f32; 4]; 4] = [
-            allignment_mat.x.extend().into(),
-            allignment_mat.y.extend().into(),
-            allignment_mat.z.extend().into(),
-            Vector4::W.into(),
-        ];
-
         let push_constants = raytrace_shader::PushConstants {
             cam_pos: camera.position.extend().into(),
-            cam_alignment_mat: padded_allignment_mat,
+            cam_alignment_mat: self.get_view_matrix(camera),
             num_rays: self.ray_data.1 as i32,
             num_spheres: self.sphere_data.1 as i32,
             
@@ -265,11 +250,23 @@ impl RayTracePipeine {
             .unwrap();
     }
 
+    /// https://math.stackexchange.com/questions/2546457/plane-vector-rotation
     fn get_view_matrix(
         &self,
         camera: &Camera,
-    ) {
+    ) -> [[f32; 4]; 4]{
+        let new_x = camera.direction.normalised();
+        let new_z = -camera.direction.cross(camera.up).normalised();
+        let new_y = -new_x.cross(new_z).normalised();
 
+        
+        let allignment_mat = Matrix3::from_columns(new_x, new_y, new_z).transposed();
+        [
+            allignment_mat.x.extend().into(),
+            allignment_mat.y.extend().into(),
+            allignment_mat.z.extend().into(),
+            Vector4::W.into(),
+        ]
     }
 }
 
