@@ -19,7 +19,6 @@ use graphics::all_vulkano::{
     sampler::{Sampler, SamplerAddressMode, SamplerMipmapMode, SamplerCreateInfo, Filter},
     descriptor_set::layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo, DescriptorSetLayoutBinding, DescriptorType},
     shader::ShaderStages,
-    padded::Padded
 };
 use graphics::all_vulkano_utils::renderer::{DeviceImageView, SwapchainImageView};
 use std::collections::BTreeMap;

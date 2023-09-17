@@ -1,4 +1,6 @@
-use maths::{Vector3, Matrix3, Vector4};
+use std::f32::consts::PI;
+
+use maths::{Vector3, Matrix3, Vector4, ChaChaRng, Rng, SeedableRng};
 use super::*;
 
 mod raytrace_shader {
@@ -21,6 +23,7 @@ pub struct RayTracePipeine {
 
     ray_data: (Subbuffer<[raytrace_shader::Ray]>, u32),
     sphere_data: (Subbuffer<[raytrace_shader::Sphere]>, u32),
+    jitter_data: (Subbuffer<[[f32; 3]]>, u32)
 }
 
 
@@ -69,6 +72,7 @@ impl RayTracePipeine {
 
             ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
             sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
+            jitter_data: (create_shader_data_buffer(vec![[0.0_f32; 3]], context, BufferType::Storage), 1),
         }
     }
 
@@ -81,6 +85,7 @@ impl RayTracePipeine {
         bindings.insert(0, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageImage));
         bindings.insert(1, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
         bindings.insert(2, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
+        bindings.insert(3, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
 
         for binding in bindings.iter_mut() {
             binding.1.stages = ShaderStages::COMPUTE;
@@ -129,7 +134,8 @@ impl RayTracePipeine {
         context: &VulkanoContext,
         camera_focal_length: f32,
         viewport_height: f32,
-        up: impl Into<Vector3>
+        up: impl Into<Vector3>,
+        samples_per_pixel: u32,
     ) {
         let viewport_width = viewport_height * (self.image_size[0] as f32 / self.image_size[1] as f32);
 
@@ -146,9 +152,9 @@ impl RayTracePipeine {
         for y in 0..self.image_size[1] {
             for x in 0..self.image_size[0] {
                 let ray_pos = first_ray + pixel_x * x as f32 - pixel_y * y as f32;
-                if (x == 0 && y == 0) || (x == self.image_size[0] - 1 && y == 0) || (x == 0 && y == self.image_size[1] - 1) || (x == self.image_size[0] - 1 && y == self.image_size[1] - 1) {
-                    println!("{:?}", ray_pos);
-                }
+                // if (x == 0 && y == 0) || (x == self.image_size[0] - 1 && y == 0) || (x == 0 && y == self.image_size[1] - 1) || (x == self.image_size[0] - 1 && y == self.image_size[1] - 1) {
+                //     println!("{:?}", ray_pos);
+                // }
                 ray_data.push((
                     Vector2::new(x as f32, (self.image_size[1] - y) as f32).extend().extend().into(),
                     ray_pos.extend().into(),
@@ -166,9 +172,17 @@ impl RayTracePipeine {
             });
         }
 
+        let mut jitter_data: Vec<[f32; 3]> = Vec::new();
+        let mut rng = ChaChaRng::seed_from_u64(16798479179);
+        for _ in 0..samples_per_pixel {
+            let val: f32 = rng.gen_range(0.0..=1.0) * PI * 2.0;
+            jitter_data.push([0.0, val.sin() / rng.gen_range(0.0..=1.0_f32).sqrt() * 0.001, val.cos() / rng.gen_range(0.0..=1.0_f32).sqrt() * 0.001]);
+        }
+
         let num_rays = rays.len() as u32;
         self.ray_data = (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays);
-        self.pixel_dims = [viewport_width / self.image_size[0] as f32, viewport_width / self.image_size[1] as f32];
+        self.pixel_dims = [viewport_width / self.image_size[0] as f32, viewport_height / self.image_size[1] as f32];
+        self.jitter_data = (create_shader_data_buffer(jitter_data, context, BufferType::Storage), samples_per_pixel)
     }
 
     pub fn update_spheres(
@@ -231,7 +245,8 @@ impl RayTracePipeine {
             [
                 WriteDescriptorSet::image_view(0, self.image.clone()),
                 WriteDescriptorSet::buffer(1, self.ray_data.0.clone()),
-                WriteDescriptorSet::buffer(2, self.sphere_data.0.clone())
+                WriteDescriptorSet::buffer(2, self.sphere_data.0.clone()),
+                WriteDescriptorSet::buffer(3, self.jitter_data.0.clone())
             ],
         )
         .unwrap();
@@ -243,8 +258,8 @@ impl RayTracePipeine {
             cam_alignment_mat: self.get_view_matrix(camera),
             num_rays: self.ray_data.1 as i32,
             num_spheres: self.sphere_data.1 as i32,
-            num_samples: 10,
-            pixel_dims: [self.pixel_dims[0], self.pixel_dims[1], 0.0, 0.0]
+            num_samples: self.jitter_data.1 as i32,
+            pixel_dims: [self.pixel_dims[0], self.pixel_dims[1], 0.0, 0.0],
         };
 
 

@@ -1,26 +1,9 @@
 #version 460
 #define FLT_MAX 3.402823466e+38
+#define M_PI 3.1415926535897932384626433832795
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-
-/// PRNG
-
-#define hashi(x) lowbias32(x)
-
-#define hash(x) (float( hashi(x) ) / float( 0xffffffffU ))
-
-// https://www.shadertoy.com/view/WttXWX
-// bias: 0.17353355999581582 ( very probably the best of its kind )
-uint lowbias32(uint x)
-{
-    x ^= x >> 16;
-    x *= 0x7feb352dU;
-    x ^= x >> 15;
-    x *= 0x846ca68bU;
-    x ^= x >> 16;
-    return x;
-}
 
 
 /// STRUCTS
@@ -51,6 +34,10 @@ layout(set = 0, binding = 2) buffer Spheres {
     Sphere[] spheres;
 };
 
+layout(set = 0, binding = 3) buffer JitterOffsets {
+    vec3[] jitter_offsets;
+};
+
 layout(push_constant) uniform PushConstants {
     vec4 cam_pos;
     mat4 cam_alignment_mat;
@@ -67,15 +54,6 @@ layout(push_constant) uniform PushConstants {
 
 vec3 ray_at(vec3 root_pos, vec3 dir, float dist) {
     return root_pos + dir * dist;
-}
-
-vec3 get_ray_dir(mat3 allignment_mat, vec3 ray_centre, ivec2 img_pos, uint ray_id, uint sample_id, float pixel_x, float pixel_y) {
-    uint number = ray_id + sample_id;
-    float x_offset = hash(number + hashi(uint(img_pos.x))) * 2 - 1;
-    float y_offset = hash(number + hashi(uint(img_pos.y))) * 2 - 1;
-
-    vec3 ray_pos = ray_centre + vec3(0, 0, 0.5) * pixel_x * x_offset + vec3(0, 0.5, 0) * (pixel_y) * y_offset;
-    return normalize(allignment_mat * ray_centre);
 }
 
 
@@ -128,11 +106,13 @@ void main() {
 
     vec3 colour = vec3(0);
     for (int i = 0; i < push_constants.num_samples; i++) {
-        vec3 dir = get_ray_dir(mat3(push_constants.cam_alignment_mat), vec3(rays[id].sample_centre), ivec2(rays[id].img_pos.xy), id, i, push_constants.pixel_dims.x, push_constants.pixel_dims.y);
-        colour += ray_colour(vec3(push_constants.cam_pos), dir);
+        
+        vec3 ray_point = vec3(rays[id].sample_centre) + jitter_offsets[i];
+        vec3 dir = (mat3(push_constants.cam_alignment_mat) * ray_point);
+
+        colour += ray_colour(vec3(push_constants.cam_pos), normalize(dir));
     }
 
-    
     colour /= push_constants.num_samples;
     imageStore(img, ivec2(rays[id].img_pos.xy), vec4(colour, 1.0));
 }

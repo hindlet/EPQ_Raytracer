@@ -2,7 +2,7 @@ use std::time::Instant;
 use graphics::*;
 use lighting_models::raytracing::*;
 
-const IMAGE_SIZE: [u32; 2] = [1000, 750];
+const IMAGE_SIZE: [u32; 2] = [1500, 1000];
 
 fn main() {
     let (mut event_loop, vulkano_context, mut vulkano_windows, window_ids, commands_allocator, descriptor_set_allocator) = get_general_graphics_data(vec![("Scene".to_string(), IMAGE_SIZE[0] as f32, IMAGE_SIZE[1] as f32, false)], gen_swapchain_func!(Format::B8G8R8A8_UNORM));
@@ -22,7 +22,7 @@ fn main() {
         &descriptor_set_allocator,
         IMAGE_SIZE
     );
-    compute_pipeline.init_data(&vulkano_context, 1.0, 2.0, camera.up);
+    compute_pipeline.init_data(&vulkano_context, 1.0, 2.0, camera.up, 100);
     compute_pipeline.update_spheres(&vulkano_context, vec![
         ([0.0, -20.0, 0.0], 20.0),
         ([2.5, 0.75, 0.0], 1.0),
