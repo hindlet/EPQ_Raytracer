@@ -22,7 +22,8 @@ fn main() {
         &descriptor_set_allocator,
         IMAGE_SIZE
     );
-    compute_pipeline.init_data(&vulkano_context, 1.0, 2.0, camera.up, 100);
+    compute_pipeline.init_data(&vulkano_context, 1.0, 2.0, camera.up, 25, 0.001);
+    // compute_pipeline.init_data(&vulkano_context, 1.0, 2.0, camera.up, 1, 0.0);
     compute_pipeline.update_spheres(&vulkano_context, vec![
         ([0.0, -20.0, 0.0], 20.0),
         ([2.5, 0.75, 0.0], 1.0),

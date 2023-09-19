@@ -1,9 +1,28 @@
 #version 460
 #define FLT_MAX 3.402823466e+38
 #define M_PI 3.1415926535897932384626433832795
+#define UINT_MAX 4294967295
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
+
+
+// Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
+uint hash(inout uint state)
+{
+    state ^= 2747636419u;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    return state;
+}
+
+float scaleToRange01(uint state)
+{
+    return state / 4294967295.0;
+}
 
 
 /// STRUCTS
@@ -34,18 +53,14 @@ layout(set = 0, binding = 2) buffer Spheres {
     Sphere[] spheres;
 };
 
-layout(set = 0, binding = 3) buffer JitterOffsets {
-    vec3[] jitter_offsets;
-};
-
 layout(push_constant) uniform PushConstants {
     vec4 cam_pos;
     mat4 cam_alignment_mat;
-    vec4 pixel_dims;
 
     int num_rays;
     int num_spheres;
     int num_samples;
+    float jitter_size;
 
 } push_constants;
 
@@ -54,6 +69,12 @@ layout(push_constant) uniform PushConstants {
 
 vec3 ray_at(vec3 root_pos, vec3 dir, float dist) {
     return root_pos + dir * dist;
+}
+
+vec3 get_ray_dir(vec3 sample_centre, inout uint state) {
+    float random = scaleToRange01(hash(state)) * 2 * M_PI;
+    vec3 new_centre = sample_centre + cos(random) * vec3(0, 0, 1) * push_constants.jitter_size * sqrt(scaleToRange01(hash(state))) + sin(random) * vec3(0, 1, 0) * push_constants.jitter_size * sqrt(scaleToRange01(hash(state)));
+    return normalize(mat3(push_constants.cam_alignment_mat) * new_centre);
 }
 
 
@@ -105,10 +126,10 @@ void main() {
     }
 
     vec3 colour = vec3(0);
+    uint state = id;
     for (int i = 0; i < push_constants.num_samples; i++) {
         
-        vec3 ray_point = vec3(rays[id].sample_centre) + jitter_offsets[i];
-        vec3 dir = (mat3(push_constants.cam_alignment_mat) * ray_point);
+        vec3 dir = get_ray_dir(vec3(rays[id].sample_centre), state);
 
         colour += ray_colour(vec3(push_constants.cam_pos), normalize(dir));
     }
