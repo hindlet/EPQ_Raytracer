@@ -46,6 +46,11 @@ vec3 RandomPointOnHemisphere(inout uint state, vec3 normal) {
 
 /// STRUCTS
 
+// struct RayTracingMaterial {
+//     vec4 colour;
+//     vec4 emission; /// vec3 colour, float strength at 1m
+// };
+
 
 struct Ray {
     vec4 sample_centre; // relative to line (1, 0, 0)
@@ -56,6 +61,13 @@ struct Ray {
 struct Sphere {
     vec3 centre;
     float radius;
+};
+
+struct RayHit {
+    vec3 hit_normal;
+    vec3 hit_pos;
+    float hit_dist;
+    // RayTracingMaterial hit_mat;
 };
 
 
@@ -103,7 +115,7 @@ vec3 colour_to_gamma_two(vec3 colour) {
 
 
 // output: (normal, hit_dist)
-vec4 intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
+RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
     vec3 l = root_pos - s.centre;
     
     float a = dot(dir, dir);
@@ -113,23 +125,33 @@ vec4 intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
 
     if (discriminant >= 0) {
         float dist = (-half_b - sqrt(discriminant)) / a;
-        return vec4(
-            ray_at(root_pos, dir, dist) - s.centre,
+        vec3 pos = ray_at(root_pos, dir, dist);
+        return RayHit(
+            pos - s.centre,
+            pos,
             dist
         );
     } else {
-        return vec4(-1);
+        return RayHit(
+            vec3(0),
+            vec3(0),
+            -1
+        );
     }
 }
 
 // output: (normal, hit_dist)
-vec4 world_hit(vec3 root_pos, vec3 dir) {
-    vec4 closest = vec4(0, 0, 0, FLT_MAX);
+RayHit world_hit(vec3 root_pos, vec3 dir) {
+    RayHit closest = RayHit (
+        vec3(0),
+        vec3(0),
+        FLT_MAX
+    );
 
     // check spheres
     for (int i = 0; i < push_constants.num_spheres; i++) {
-        vec4 hit_info = intersecting_sphere(spheres[i], root_pos, dir);
-        if (hit_info.w >= 0.0 && hit_info.w < closest.w && hit_info.w > 0.001) {
+        RayHit hit_info = intersecting_sphere(spheres[i], root_pos, dir);
+        if (hit_info.hit_dist >= 0.0 && hit_info.hit_dist < closest.hit_dist && hit_info.hit_dist > 0.001) {
             closest = hit_info;
         }
     }
@@ -170,10 +192,10 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
     vec3 ray_dir = dir;
 
     for (int i = 0; i <= push_constants.max_bounces; i++) {
-        vec4 hit = world_hit(ray_pos, ray_dir);
-        if (hit.w < FLT_MAX) {
-            ray_pos = ray_at(ray_pos, ray_dir, hit.w);
-            ray_dir = normalize(vec3(hit) + RandomPointOnUnitSphere(state));
+        RayHit hit = world_hit(ray_pos, ray_dir);
+        if (hit.hit_dist < FLT_MAX) {
+            ray_pos = hit.hit_pos;
+            ray_dir = normalize(hit.hit_normal + RandomPointOnUnitSphere(state));
             
             colour *= 0.5;
         }

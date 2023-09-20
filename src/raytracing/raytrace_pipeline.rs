@@ -249,7 +249,7 @@ impl RayTracePipeine {
             num_spheres: self.sphere_data.1 as i32,
             num_samples: self.sample_data.1 as i32,
             jitter_size: self.sample_data.0,
-            max_bounces: 1,
+            max_bounces: 10,
         };
 
 
