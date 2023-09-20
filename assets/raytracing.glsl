@@ -125,7 +125,7 @@ vec4 world_hit(vec3 root_pos, vec3 dir) {
     // check spheres
     for (int i = 0; i < push_constants.num_spheres; i++) {
         vec4 hit_info = intersecting_sphere(spheres[i], root_pos, dir);
-        if (hit_info.w >= 0.0 && hit_info.w < closest.w) {
+        if (hit_info.w >= 0.0 && hit_info.w < closest.w && hit_info.w > 0.001) {
             closest = hit_info;
         }
     }
