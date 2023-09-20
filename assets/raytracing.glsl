@@ -169,7 +169,7 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
         vec4 hit = world_hit(ray_pos, ray_dir);
         if (hit.w < FLT_MAX) {
             ray_pos = ray_at(ray_pos, ray_dir, hit.w);
-            ray_dir = RandomPointOnHemisphere(state, vec3(hit));
+            ray_dir = normalize(vec3(hit) + RandomPointOnUnitSphere(state));
             
             colour *= 0.5;
         }
