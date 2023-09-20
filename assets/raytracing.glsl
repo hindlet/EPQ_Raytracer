@@ -97,6 +97,10 @@ vec3 get_ray_dir(vec3 sample_centre, inout uint state) {
     return normalize(mat3(push_constants.cam_alignment_mat) * new_centre);
 }
 
+vec3 colour_to_gamma_two(vec3 colour) {
+    return vec3(sqrt(colour.x), sqrt(colour.y), sqrt(colour.z));
+}
+
 
 // output: (normal, hit_dist)
 vec4 intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
@@ -174,7 +178,7 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
             colour *= 0.5;
         }
         else {
-            light += environment_light(ray_dir) * colour;
+            light += environment_light(ray_dir) * colour_to_gamma_two(colour);
             break;
         }
     }
