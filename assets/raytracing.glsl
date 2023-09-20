@@ -93,6 +93,7 @@ layout(push_constant) uniform PushConstants {
     int num_samples;
     float jitter_size;
     int max_bounces;
+    bool use_environment_light;
 
 } push_constants;
 
@@ -161,6 +162,7 @@ RayHit world_hit(vec3 root_pos, vec3 dir) {
 }
 
 vec3 environment_light(vec3 dir) {
+    if (!push_constants.use_environment_light) {return vec3(0);}
     float a = 0.5*(dir.y + 1.0);
     return (1.0-a)*vec3(1.0) + a*vec3(0.5, 0.7, 1.0);
 }

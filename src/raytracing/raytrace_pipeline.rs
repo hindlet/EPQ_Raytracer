@@ -102,7 +102,8 @@ impl RayTracePipeine {
             size_of::<i32>() + // num_spheres;
             size_of::<i32>() + // num_samples;
             size_of::<f32>() + // jitter_size;
-            size_of::<i32>()  // max_bounces;
+            size_of::<i32>() + // max_bounces;
+            size_of::<u32>() // use_environment_light
         ;
 
 
@@ -250,6 +251,7 @@ impl RayTracePipeine {
             num_samples: self.sample_data.1 as i32,
             jitter_size: self.sample_data.0,
             max_bounces: 10,
+            use_environment_light: false as u32,
         };
 
 
