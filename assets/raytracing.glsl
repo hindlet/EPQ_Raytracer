@@ -46,10 +46,17 @@ vec3 RandomPointOnHemisphere(inout uint state, vec3 normal) {
 
 /// STRUCTS
 
-// struct RayTracingMaterial {
-//     vec4 colour;
-//     vec4 emission; /// vec3 colour, float strength at 1m
-// };
+struct RayTracingMaterial {
+    vec4 colour;
+    vec4 emission; /// vec3 colour, float strength at 1m
+};
+
+RayTracingMaterial empty_mat() {
+    return RayTracingMaterial (
+        vec4(0),
+        vec4(0)
+    );
+}
 
 
 struct Ray {
@@ -61,14 +68,24 @@ struct Ray {
 struct Sphere {
     vec3 centre;
     float radius;
+    RayTracingMaterial material;
 };
 
 struct RayHit {
     vec3 hit_normal;
     vec3 hit_pos;
     float hit_dist;
-    // RayTracingMaterial hit_mat;
+    RayTracingMaterial hit_mat;
 };
+
+RayHit empty_hit() {
+    return RayHit (
+        vec3(0),
+        vec3(0),
+        -1,
+        empty_mat()
+    );
+}
 
 
 /// BUFFERS
@@ -115,7 +132,6 @@ vec3 colour_to_gamma_two(vec3 colour) {
 }
 
 
-// output: (normal, hit_dist)
 RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
     vec3 l = root_pos - s.centre;
     
@@ -130,24 +146,17 @@ RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
         return RayHit(
             pos - s.centre,
             pos,
-            dist
+            dist,
+            s.material
         );
     } else {
-        return RayHit(
-            vec3(0),
-            vec3(0),
-            -1
-        );
+        return empty_hit();
     }
 }
 
-// output: (normal, hit_dist)
+
 RayHit world_hit(vec3 root_pos, vec3 dir) {
-    RayHit closest = RayHit (
-        vec3(0),
-        vec3(0),
-        FLT_MAX
-    );
+    RayHit closest = empty_hit();
 
     // check spheres
     for (int i = 0; i < push_constants.num_spheres; i++) {
@@ -168,24 +177,6 @@ vec3 environment_light(vec3 dir) {
 }
 
 
-// vec3 ray_colour(vec3 root_pos, vec3 dir, inout uint state, uint remaining_hits) {
-
-//     if (remaining_hits == 0) {
-//         float a = 0.5*(dir.y + 1.0);
-//         return (1.0-a)*vec3(1.0) + a*vec3(0.5, 0.7, 1.0);
-//     }
-    
-//     // sphere intersections
-//     vec4 hit = world_hit(root_pos, dir);
-//     if (hit.w < FLT_MAX) {
-//         vec3 direction = RandomPointOnHemisphere(state, vec3(hit));
-//         return 0.5 * ray_colour(ray_at(root_pos, dir, hit.w), direction, state, remaining_hits - 1);
-
-//     }
-    
-    
-// }
-
 vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
     vec3 light = vec3(0);
     vec3 colour = vec3(1);
@@ -199,6 +190,7 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
             ray_pos = hit.hit_pos;
             ray_dir = normalize(hit.hit_normal + RandomPointOnUnitSphere(state));
             
+            // colour *= vec3(hit.hit_mat.colour);
             colour *= 0.5;
         }
         else {
@@ -206,6 +198,8 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
             break;
         }
     }
+
+    // light = environment_light(ray_dir);
 
     return light;
 }

@@ -9,6 +9,58 @@ mod raytrace_shader {
 }
 
 
+#[derive(Clone, Copy, Debug)]
+pub struct RayTraceMaterial {
+    pub colour: Vector3,
+    pub emmision: Vector4
+}
+
+impl Into<raytrace_shader::RayTracingMaterial> for RayTraceMaterial {
+    fn into(self) -> raytrace_shader::RayTracingMaterial {
+        raytrace_shader::RayTracingMaterial {
+            colour: self.colour.extend().into(),
+            emission: self.emmision.into()
+        }
+    }
+}
+
+impl Default for RayTraceMaterial {
+    fn default() -> Self {
+        RayTraceMaterial {
+            colour: Vector3::ZERO,
+            emmision: Vector4::ZERO
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Sphere {
+    pub centre: Vector3,
+    pub radius: f32,
+    pub material: RayTraceMaterial
+}
+
+impl Into<raytrace_shader::Sphere> for Sphere {
+    fn into(self) -> raytrace_shader::Sphere {
+        raytrace_shader::Sphere {
+            centre: self.centre.into(),
+            radius: self.radius,
+            material: self.material.into()
+        }
+    }
+}
+
+impl Default for Sphere {
+    fn default() -> Self {
+        Sphere {
+            centre: Vector3::ZERO,
+            radius: 0.0,
+            material: RayTraceMaterial::default()
+        }
+    }
+}
+
+
 
 pub struct RayTracePipeine {
     compute_queue: Arc<Queue>,
@@ -52,10 +104,7 @@ impl RayTracePipeine {
             sample_centre: [0.0, 0.0, 0.0, 0.0],
             img_pos: [0.0, 0.0, 0.0, 0.0]
         };
-        let null_sphere = raytrace_shader::Sphere {
-            centre: [0.0, 0.0, 0.0],
-            radius: 0.0
-        };
+        let null_sphere: raytrace_shader::Sphere = Sphere::default().into();
         
 
         RayTracePipeine {
@@ -179,15 +228,12 @@ impl RayTracePipeine {
     pub fn update_spheres(
         &mut self,
         context: &VulkanoContext,
-        sphere_data: Vec<([f32; 3], f32)>
+        sphere_data: Vec<Sphere>
     ) {
         let mut spheres: Vec<raytrace_shader::Sphere> = Vec::new();
 
-        for datum in sphere_data.iter() {
-            spheres.push(raytrace_shader::Sphere {
-                centre: datum.0,
-                radius: datum.1
-            });
+        for sphere in sphere_data.iter() {
+            spheres.push((*sphere).into());
         }
 
         let num_spheres = spheres.len() as u32;
@@ -251,7 +297,7 @@ impl RayTracePipeine {
             num_samples: self.sample_data.1 as i32,
             jitter_size: self.sample_data.0,
             max_bounces: 10,
-            use_environment_light: false as u32,
+            use_environment_light: true as u32,
         };
 
 
