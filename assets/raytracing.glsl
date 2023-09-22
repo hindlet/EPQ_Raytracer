@@ -82,7 +82,7 @@ RayHit empty_hit() {
     return RayHit (
         vec3(0),
         vec3(0),
-        -1,
+        FLT_MAX,
         empty_mat()
     );
 }
@@ -190,8 +190,8 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
             ray_pos = hit.hit_pos;
             ray_dir = normalize(hit.hit_normal + RandomPointOnUnitSphere(state));
             
-            // colour *= vec3(hit.hit_mat.colour);
-            colour *= 0.5;
+            colour *= vec3(hit.hit_mat.colour);
+            // colour *= 0.5;
         }
         else {
             light += environment_light(ray_dir) * colour_to_gamma_two(colour);
