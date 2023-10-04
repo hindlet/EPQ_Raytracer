@@ -267,7 +267,10 @@ impl BlinnPhongPipeline {
 pub fn get_uniforms(
     swapchain_size: [u32; 2],
     allocator: &SubbufferAllocator,
-    camera: &Camera
+    camera: &Camera,
+    ambient_strength: f32,
+    diffuse_strength: f32,
+    specular_strength: f32
 ) -> (Subbuffer<vs::Data>, Subbuffer<fs::Data>) {
     let (view, proj) = get_generic_uniforms(swapchain_size, camera);
 
@@ -278,6 +281,9 @@ pub fn get_uniforms(
     };
     let fragment_uniform_data = fs::Data {
         viewpos: camera.position.into(),
+        ambient_strength: ambient_strength,
+        diffuse_strength: diffuse_strength,
+        specular_strength: specular_strength
     };
 
     let vert_buffer = allocator.allocate_sized().unwrap();
