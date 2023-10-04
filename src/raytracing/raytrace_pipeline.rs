@@ -12,14 +12,20 @@ mod raytrace_shader {
 #[derive(Clone, Copy, Debug)]
 pub struct RayTraceMaterial {
     pub colour: Vector3,
+    pub roughness: f32,
+    pub metalic: f32,
     pub emmision: Vector4
 }
 
 impl Into<raytrace_shader::RayTracingMaterial> for RayTraceMaterial {
     fn into(self) -> raytrace_shader::RayTracingMaterial {
+        let normal_colour = self.colour.normalised();
         raytrace_shader::RayTracingMaterial {
-            colour: self.colour.extend().into(),
-            emission: self.emmision.into()
+            colour: [normal_colour.x, normal_colour.y, normal_colour.z, 1.0],
+            // roughness: self.roughness.clamp(0.0, 1.0),
+            emission: self.emmision.into(),
+            // metalic: self.metalic.clamp(0.0, 1.0)
+            settings: [self.roughness.clamp(0.0, 1.0), self.metalic.clamp(0.0, 1.0), 0.0, 0.0]
         }
     }
 }
@@ -28,7 +34,9 @@ impl Default for RayTraceMaterial {
     fn default() -> Self {
         RayTraceMaterial {
             colour: Vector3::ZERO,
-            emmision: Vector4::ZERO
+            emmision: Vector4::ZERO,
+            roughness: 0.5,
+            metalic: 0.0,
         }
     }
 }
@@ -296,7 +304,7 @@ impl RayTracePipeine {
             num_spheres: self.sphere_data.1 as i32,
             num_samples: self.sample_data.1 as i32,
             jitter_size: self.sample_data.0,
-            max_bounces: 10,
+            max_bounces: 50,
             use_environment_light: true as u32,
         };
 

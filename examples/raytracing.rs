@@ -26,10 +26,10 @@ fn main() {
     // compute_pipeline.init_data(&vulkano_context, 1.0, 2.0, camera.up, 1, 0.0);
 
     let spheres = vec![
-        Sphere {centre: [0, -20, 0].into(), radius: 20.0, material: RayTraceMaterial {colour: [0.5, 0.5, 0.5].into(), ..Default::default()}},
-        Sphere {centre: [2.5, 0.75, 0.0].into(), radius: 1.0, material: RayTraceMaterial {colour: [0.5, 0.5, 0.5].into(), ..Default::default()}},
-        Sphere {centre: [-2.5, 0.75, 0.0].into(), radius: 1.0, material: RayTraceMaterial {colour: [0.5, 0.5, 0.5].into(), ..Default::default()}},
-        Sphere {centre: [0, 1, 0].into(), radius: 1.0, material: RayTraceMaterial {colour: [0.5, 0.5, 0.5].into(), ..Default::default()}},
+        Sphere {centre: [0, -20, 0].into(), radius: 20.0, material: RayTraceMaterial {colour: [0.7, 0.1, 0.7].into(), roughness: 1.0, metalic: 0.0, ..Default::default()}},
+        // Sphere {centre: [2.5, 0.75, 0.0].into(), radius: 1.0, material: RayTraceMaterial {colour: [1, 0, 0].into(), ..Default::default()}},
+        // Sphere {centre: [-2.5, 0.75, 0.0].into(), radius: 1.0, material: RayTraceMaterial {colour: [0.0, 0.5, 0.5].into(), ..Default::default()}},
+        Sphere {centre: [0, 1, 0].into(), radius: 1.0, material: RayTraceMaterial {colour: [1.0, 0.4, 0.4].into(), roughness: 0.0, metalic: 1.0, ..Default::default()}},
     ];
 
     compute_pipeline.update_spheres(&vulkano_context, spheres);

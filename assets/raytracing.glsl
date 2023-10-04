@@ -49,10 +49,12 @@ vec3 RandomPointOnHemisphere(inout uint state, vec3 normal) {
 struct RayTracingMaterial {
     vec4 colour;
     vec4 emission; /// vec3 colour, float strength at 1m
+    vec4 settings; // roughness, metalic
 };
 
 RayTracingMaterial empty_mat() {
     return RayTracingMaterial (
+        vec4(0, 0, 0, 1),
         vec4(0),
         vec4(0)
     );
@@ -131,6 +133,10 @@ vec3 colour_to_gamma_two(vec3 colour) {
     return vec3(sqrt(colour.x), sqrt(colour.y), sqrt(colour.z));
 }
 
+vec3 lerp(vec3 a, vec3 b, float x) {
+    return (a + b) * x;
+}
+
 
 RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
     vec3 l = root_pos - s.centre;
@@ -176,6 +182,11 @@ vec3 environment_light(vec3 dir) {
     return (1.0-a)*vec3(1.0) + a*vec3(0.5, 0.7, 1.0);
 }
 
+vec3 adjust_dir(vec3 dir, vec3 normal, RayTracingMaterial mat, inout uint state) {
+    vec3 scatter = normalize(lerp(normal, reflect(dir, normal), mat.settings.y) + RandomPointOnUnitSphere(state) * mat.settings.x);
+    return scatter;
+}
+
 
 vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
     vec3 light = vec3(0);
@@ -188,7 +199,7 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
         RayHit hit = world_hit(ray_pos, ray_dir);
         if (hit.hit_dist < FLT_MAX) {
             ray_pos = hit.hit_pos;
-            ray_dir = normalize(hit.hit_normal + RandomPointOnUnitSphere(state));
+            ray_dir = adjust_dir(ray_dir, hit.hit_normal, hit.hit_mat, state);
             
             colour *= vec3(hit.hit_mat.colour);
             // colour *= 0.5;
