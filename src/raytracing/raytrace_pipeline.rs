@@ -22,9 +22,7 @@ impl Into<raytrace_shader::RayTracingMaterial> for RayTraceMaterial {
         let normal_colour = self.colour.normalised();
         raytrace_shader::RayTracingMaterial {
             colour: [normal_colour.x, normal_colour.y, normal_colour.z, 1.0],
-            // roughness: self.roughness.clamp(0.0, 1.0),
             emission: self.emmision.into(),
-            // metalic: self.metalic.clamp(0.0, 1.0)
             settings: [self.roughness.clamp(0.0, 1.0), self.metalic.clamp(0.0, 1.0), 0.0, 0.0]
         }
     }
@@ -68,6 +66,21 @@ impl Default for Sphere {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct RayTracingMesh<T: graphics::Position + BufferContents + Copy + Clone> {
+    pub mesh: Mesh<T>,
+    pub material: RayTraceMaterial
+}
+
+fn get_null_mesh() -> RayTracingMesh<PositionVertex> {
+    let mut mesh = Mesh::new(vec![PositionVertex{position: [0.0; 3]}], vec![0, 0, 0]);
+    mesh.set_normals(vec![Normal{normal: [1.0; 3]}]);
+    RayTracingMesh {
+        mesh: mesh,
+        material: RayTraceMaterial::default()
+    }
+}
+
 
 
 pub struct RayTracePipeine {
@@ -80,7 +93,8 @@ pub struct RayTracePipeine {
 
     ray_data: (Subbuffer<[raytrace_shader::Ray]>, u32),
     sphere_data: (Subbuffer<[raytrace_shader::Sphere]>, u32),
-    sample_data: (f32, u32),
+    sample_data: (f32, u32, u32), // jitter_size, num_samples, max_bounces
+    mesh_data: (Subbuffer<[raytrace_shader::Triangle]>, Subbuffer<[raytrace_shader::Mesh]>, u32)
 }
 
 
@@ -113,6 +127,7 @@ impl RayTracePipeine {
             img_pos: [0.0, 0.0, 0.0, 0.0]
         };
         let null_sphere: raytrace_shader::Sphere = Sphere::default().into();
+        let (null_tris, null_meshes) = transform_meshes(context, &vec![get_null_mesh()]); //CAUSES CRASH BC EMPTY BUFFER
         
 
         RayTracePipeine {
@@ -125,7 +140,8 @@ impl RayTracePipeine {
 
             ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
             sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
-            sample_data: (0.0, 1),   
+            sample_data: (0.0, 1, 1),
+            mesh_data: (null_tris, null_meshes, 0),
         }
     }
 
@@ -138,6 +154,8 @@ impl RayTracePipeine {
         bindings.insert(0, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageImage));
         bindings.insert(1, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
         bindings.insert(2, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
+        bindings.insert(3, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
+        bindings.insert(4, DescriptorSetLayoutBinding::descriptor_type(DescriptorType::StorageBuffer));
 
         for binding in bindings.iter_mut() {
             binding.1.stages = ShaderStages::COMPUTE;
@@ -157,6 +175,7 @@ impl RayTracePipeine {
             size_of::<f32>() * 16 + // cam allignment mat
             size_of::<i32>() + // num_rays;
             size_of::<i32>() + // num_spheres;
+            size_of::<i32>() + // num_meshes
             size_of::<i32>() + // num_samples;
             size_of::<f32>() + // jitter_size;
             size_of::<i32>() + // max_bounces;
@@ -191,6 +210,7 @@ impl RayTracePipeine {
         up: impl Into<Vector3>,
         samples_per_pixel: u32,
         jitter_size: f32,
+        max_bounces: u32,
     ) {
         let viewport_width = viewport_height * (self.image_size[0] as f32 / self.image_size[1] as f32);
 
@@ -230,7 +250,7 @@ impl RayTracePipeine {
         let num_rays = rays.len() as u32;
         self.ray_data = (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays);
         // self.pixel_dims = [viewport_width / self.image_size[0] as f32, viewport_height / self.image_size[1] as f32];
-        self.sample_data = (jitter_size, samples_per_pixel);
+        self.sample_data = (jitter_size, samples_per_pixel, max_bounces);
     }
 
     pub fn update_spheres(
@@ -246,6 +266,17 @@ impl RayTracePipeine {
 
         let num_spheres = spheres.len() as u32;
         self.sphere_data = (create_shader_data_buffer(spheres, context, BufferType::Storage), num_spheres);
+    }
+
+    pub fn update_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
+        &mut self,
+        context: &VulkanoContext,
+        mesh_data: &Vec<RayTracingMesh<T>>
+    ) {
+        let num_meshes = mesh_data.len() as u32;
+        // println!("{:?}", num_meshes);
+        let (tri_buffer, mesh_buffer) = transform_meshes(context, mesh_data);
+        self.mesh_data = (tri_buffer, mesh_buffer, num_meshes);
     }
 
     pub fn compute(
@@ -291,6 +322,8 @@ impl RayTracePipeine {
                 WriteDescriptorSet::image_view(0, self.image.clone()),
                 WriteDescriptorSet::buffer(1, self.ray_data.0.clone()),
                 WriteDescriptorSet::buffer(2, self.sphere_data.0.clone()),
+                WriteDescriptorSet::buffer(3, self.mesh_data.0.clone()),
+                WriteDescriptorSet::buffer(4, self.mesh_data.1.clone())
             ],
         )
         .unwrap();
@@ -302,9 +335,10 @@ impl RayTracePipeine {
             cam_alignment_mat: self.get_view_matrix(camera),
             num_rays: self.ray_data.1 as i32,
             num_spheres: self.sphere_data.1 as i32,
+            num_meshes: self.mesh_data.2 as i32,
             num_samples: self.sample_data.1 as i32,
             jitter_size: self.sample_data.0,
-            max_bounces: 50,
+            max_bounces: self.sample_data.2 as i32,
             use_environment_light: true as u32,
         };
 
@@ -337,3 +371,38 @@ impl RayTracePipeine {
     }
 }
 
+
+fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
+    context: &VulkanoContext,
+    meshes: &Vec<RayTracingMesh<T>>,
+) -> (Subbuffer<[raytrace_shader::Triangle]>, Subbuffer<[raytrace_shader::Mesh]>) {
+    let mut tri_count = 0;
+    let mut tris: Vec<raytrace_shader::Triangle> = Vec::new();
+    let mut mesh_data: Vec<raytrace_shader::Mesh> = Vec::new();
+    for mesh in meshes.iter() {
+        let mat = mesh.material;
+        let mesh = mesh.mesh.clone();
+        let num_tris = mesh.indices.len() as u32 / 3;
+        mesh_data.push(raytrace_shader::Mesh {
+            first_index: tri_count,
+            len: num_tris,
+            material: mat.into(),
+            blank: [0.0; 2],
+        });
+        tri_count += num_tris;
+        for i in (0..mesh.indices.len()).step_by(3) {
+            let a = mesh.vertices[mesh.indices[i + 0] as usize].pos();
+            let b = mesh.vertices[mesh.indices[i + 1] as usize].pos();
+            let c = mesh.vertices[mesh.indices[i + 2] as usize].pos();
+            tris.push(raytrace_shader::Triangle {
+                a: [a[0], a[1], a[2], 1.0],
+                b: [b[0], b[1], b[2], 1.0],
+                c: [c[0], c[1], c[2], 1.0],
+            })
+        }
+    }
+
+    let tri_buffer = create_shader_data_buffer(tris, context, BufferType::Storage);
+    let mesh_buffer = create_shader_data_buffer(mesh_data, context, BufferType::Storage);
+    (tri_buffer, mesh_buffer)
+}

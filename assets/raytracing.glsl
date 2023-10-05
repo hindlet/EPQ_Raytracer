@@ -73,6 +73,19 @@ struct Sphere {
     RayTracingMaterial material;
 };
 
+struct Triangle {
+    vec4 a;
+    vec4 b;
+    vec4 c;
+};
+
+struct Mesh {
+    uint first_index;
+    uint len;
+    vec2 blank;
+    RayTracingMaterial material;
+};
+
 struct RayHit {
     vec3 hit_normal;
     vec3 hit_pos;
@@ -103,12 +116,22 @@ layout(set = 0, binding = 2) buffer Spheres {
     Sphere[] spheres;
 };
 
+layout(set = 0, binding = 3) buffer Triangles {
+    Triangle[] triangles;
+};
+
+layout(set = 0, binding = 4) buffer Meshes {
+    Mesh[] meshes;
+};
+
 layout(push_constant) uniform PushConstants {
     vec4 cam_pos;
     mat4 cam_alignment_mat;
 
     int num_rays;
     int num_spheres;
+    int num_meshes;
+
     int num_samples;
     float jitter_size;
     int max_bounces;
@@ -160,6 +183,56 @@ RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
     }
 }
 
+// (hit_normal, hit dist)
+vec4 intersecting_tri(Triangle t, vec3 root_pos, vec3 dir) {
+
+    vec3 a = vec3(t.a);
+    vec3 b = vec3(t.b);
+    vec3 c = vec3(t.c);
+    vec3 edge_one = b - a;
+    vec3 edge_two = c - a;
+    vec3 normal = cross(edge_one, edge_two);
+
+    vec3 ao = root_pos - a;
+    vec3 dao = cross(ao, dir);
+
+    float det = -dot(dir,normal);
+    if (det == 0) {return vec4(FLT_MAX);}
+
+    float inv_det = 1 / det;
+
+    float dist = dot(ao, normal) * inv_det;
+    float u = dot(edge_two, dao) * inv_det;
+    float v = -dot(edge_one, dao) * inv_det;
+    float w = 1 - u - v;
+
+    if (dist < 0 || u < 0 || v < 0 || w < 0) {return vec4(FLT_MAX);}
+
+
+    return vec4(normal, dist);
+}
+
+RayHit intersecting_mesh(Mesh m, vec3 root_pos, vec3 dir) {
+
+    vec4 closest = vec4(FLT_MAX);
+
+    for (uint i = 0; i < m.len; i++) {
+        vec4 hit_info = intersecting_tri(triangles[i + m.first_index], root_pos, dir);
+        if (hit_info.w > 0.001 && hit_info.w < closest.w) {
+            closest = hit_info;
+        }
+    }
+
+    if (closest.w == FLT_MAX) {return empty_hit();}
+
+    return RayHit(
+        vec3(closest),
+        ray_at(root_pos, dir, closest.w),
+        closest.w,
+        m.material
+    );
+}
+
 
 RayHit world_hit(vec3 root_pos, vec3 dir) {
     RayHit closest = empty_hit();
@@ -167,7 +240,15 @@ RayHit world_hit(vec3 root_pos, vec3 dir) {
     // check spheres
     for (int i = 0; i < push_constants.num_spheres; i++) {
         RayHit hit_info = intersecting_sphere(spheres[i], root_pos, dir);
-        if (hit_info.hit_dist >= 0.0 && hit_info.hit_dist < closest.hit_dist && hit_info.hit_dist > 0.001) {
+        if (hit_info.hit_dist > 0.001 && hit_info.hit_dist < closest.hit_dist) {
+            closest = hit_info;
+        }
+    }
+
+    // check meshes
+    for (int i = 0; i < push_constants.num_meshes; i++) {
+        RayHit hit_info = intersecting_mesh(meshes[i], root_pos, dir);
+        if (hit_info.hit_dist > 0.001 && hit_info.hit_dist < closest.hit_dist) {
             closest = hit_info;
         }
     }
