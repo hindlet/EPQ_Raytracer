@@ -73,10 +73,13 @@ struct Sphere {
     RayTracingMaterial material;
 };
 
+
+// made of three points: a, b, c
 struct Triangle {
-    vec4 a;
-    vec4 b;
-    vec4 c;
+    vec4 a; // first point
+    vec4 edge_one; // edge one (b - a)
+    vec4 edge_two; // edge two (c - a)
+    vec4 normal; // normal (edge_one x edge_two)
 };
 
 struct Mesh {
@@ -186,28 +189,26 @@ RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
 // (hit_normal, hit dist)
 vec4 intersecting_tri(Triangle t, vec3 root_pos, vec3 dir) {
 
-    vec3 a = vec3(t.a);
-    vec3 b = vec3(t.b);
-    vec3 c = vec3(t.c);
-    vec3 edge_one = b - a;
-    vec3 edge_two = c - a;
-    vec3 normal = cross(edge_one, edge_two);
+    vec3 normal = vec3(t.normal);
 
-    vec3 ao = root_pos - a;
+    vec3 ao = root_pos - vec3(t.a);
     vec3 dao = cross(ao, dir);
 
-    float det = -dot(dir,normal);
+    float det = -dot(dir, normal);
     if (det == 0) {return vec4(FLT_MAX);}
 
     float inv_det = 1 / det;
-
     float dist = dot(ao, normal) * inv_det;
-    float u = dot(edge_two, dao) * inv_det;
-    float v = -dot(edge_one, dao) * inv_det;
+    if (dist < 0) {return vec4(FLT_MAX);}
+
+    float u = dot(vec3(t.edge_two), dao) * inv_det;
+    if (u < 0) {return vec4(FLT_MAX);}
+
+    float v = -dot(vec3(t.edge_one), dao) * inv_det;
+    if (v < 0) {return vec4(FLT_MAX);}
+
     float w = 1 - u - v;
-
-    if (dist < 0 || u < 0 || v < 0 || w < 0) {return vec4(FLT_MAX);}
-
+    if (w < 0) {return vec4(FLT_MAX);}
 
     return vec4(normal, dist);
 }

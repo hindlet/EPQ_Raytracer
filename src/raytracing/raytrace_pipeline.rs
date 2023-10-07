@@ -383,6 +383,7 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
     let mut tris: Vec<raytrace_shader::Triangle> = Vec::new();
     let mut mesh_data: Vec<raytrace_shader::Mesh> = Vec::new();
     for mesh in meshes.iter() {
+
         let mat = mesh.material;
         let mesh = mesh.mesh.clone();
         let num_tris = mesh.indices.len() as u32 / 3;
@@ -393,14 +394,20 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
             blank: [0.0; 2],
         });
         tri_count += num_tris;
+
         for i in (0..mesh.indices.len()).step_by(3) {
-            let a = mesh.vertices[mesh.indices[i + 0] as usize].pos();
-            let b = mesh.vertices[mesh.indices[i + 1] as usize].pos();
-            let c = mesh.vertices[mesh.indices[i + 2] as usize].pos();
+            let a: Vector3 = mesh.vertices[mesh.indices[i + 0] as usize].pos().into();
+            let b: Vector3 = mesh.vertices[mesh.indices[i + 1] as usize].pos().into();
+            let c: Vector3 = mesh.vertices[mesh.indices[i + 2] as usize].pos().into();
+            let edge_one = b - a;
+            let edge_two = c - a;
+            let norm = edge_one.cross(edge_two);
+            
             tris.push(raytrace_shader::Triangle {
-                a: [a[0], a[1], a[2], 1.0],
-                b: [b[0], b[1], b[2], 1.0],
-                c: [c[0], c[1], c[2], 1.0],
+                a: a.extend().into(),
+                edge_one: edge_one.extend().into(),
+                edge_two: edge_two.extend().into(),
+                normal: norm.extend().into()
             })
         }
     }
