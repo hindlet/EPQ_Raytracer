@@ -1,5 +1,6 @@
 #version 460
 #define FLT_MAX 3.402823466e+38
+#define FLT_MIN 1.175494e-38
 #define M_PI 3.1415926535897932384626433832795
 #define UINT_MAX 4294967295
 
@@ -83,9 +84,10 @@ struct Triangle {
 };
 
 struct Mesh {
+    vec3 min_point;
     uint first_index;
+    vec3 max_point;
     uint len;
-    vec2 blank;
     RayTracingMaterial material;
 };
 
@@ -186,6 +188,26 @@ RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
     }
 }
 
+bool intersecting_aabb(vec3 min_point, vec3 max_point, vec3 root_pos, vec3 dir) {
+    vec3 inv_dir = vec3(1) / dir;
+    float d_max;
+    float d_min;
+
+    d_max = (((inv_dir.x < 0) ? min_point.x : max_point.x) - root_pos.x) * inv_dir.x;
+    d_min = (((inv_dir.x < 0) ? max_point.x : min_point.x) - root_pos.x) * inv_dir.x;
+    if (d_max > 0 || d_min > 0) {return true;}
+
+    d_max = max(d_max, (((inv_dir.y < 0) ? min_point.y : max_point.y) - root_pos.y) * inv_dir.y );
+    d_min = min(d_max, (((inv_dir.y < 0) ? max_point.y : min_point.y) - root_pos.y) * inv_dir.y );
+    if (d_max > 0 || d_min > 0) {return true;}
+
+    d_max = max(d_max, (((inv_dir.z < 0) ? min_point.z : max_point.z) - root_pos.z) * inv_dir.z );
+    d_min = max(d_min, (((inv_dir.z < 0) ? max_point.z : min_point.z) - root_pos.z) * inv_dir.z );
+    if (d_max > 0 || d_min > 0) {return true;}
+
+    return false;
+}
+
 // (hit_normal, hit dist)
 vec4 intersecting_tri(Triangle t, vec3 root_pos, vec3 dir) {
 
@@ -214,6 +236,8 @@ vec4 intersecting_tri(Triangle t, vec3 root_pos, vec3 dir) {
 }
 
 RayHit intersecting_mesh(Mesh m, vec3 root_pos, vec3 dir) {
+
+    if (!intersecting_aabb(m.min_point, m.max_point, root_pos, dir)) {return empty_hit();}
 
     vec4 closest = vec4(FLT_MAX);
 

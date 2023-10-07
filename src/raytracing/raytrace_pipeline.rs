@@ -386,14 +386,9 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
 
         let mat = mesh.material;
         let mesh = mesh.mesh.clone();
-        let num_tris = mesh.indices.len() as u32 / 3;
-        mesh_data.push(raytrace_shader::Mesh {
-            first_index: tri_count,
-            len: num_tris,
-            material: mat.into(),
-            blank: [0.0; 2],
-        });
-        tri_count += num_tris;
+        let (mut min_x, mut min_y, mut min_z) = (f32::MAX, f32::MAX, f32::MAX);
+        let (mut max_x, mut max_y, mut max_z) = (f32::MIN, f32::MIN, f32::MIN);
+        
 
         for i in (0..mesh.indices.len()).step_by(3) {
             let a: Vector3 = mesh.vertices[mesh.indices[i + 0] as usize].pos().into();
@@ -402,7 +397,15 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
             let edge_one = b - a;
             let edge_two = c - a;
             let norm = edge_one.cross(edge_two);
-            
+
+            min_x = min_x.min(a.x.min(b.x.min(c.x)));
+            min_y = min_y.min(a.y.min(b.y.min(c.y)));
+            min_z = min_z.min(a.z.min(b.z.min(c.z)));
+
+            max_x = max_x.max(a.x.max(b.x.max(c.x)));
+            max_y = max_y.max(a.y.max(b.y.max(c.y)));
+            max_z = max_z.max(a.z.max(b.z.max(c.z)));
+
             tris.push(raytrace_shader::Triangle {
                 a: a.extend().into(),
                 edge_one: edge_one.extend().into(),
@@ -410,6 +413,17 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
                 normal: norm.extend().into()
             })
         }
+
+        let num_tris = mesh.indices.len() as u32 / 3;
+        mesh_data.push(raytrace_shader::Mesh {
+            first_index: tri_count,
+            len: num_tris,
+            material: mat.into(),
+            min_point: [min_x, min_y, min_z],
+            max_point: [max_x, max_y, max_z]
+        });
+        tri_count += num_tris;
+
     }
 
     let tri_buffer = create_shader_data_buffer(tris, context, BufferType::Storage);
