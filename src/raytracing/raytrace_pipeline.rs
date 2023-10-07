@@ -9,6 +9,8 @@ mod raytrace_shader {
 }
 
 
+const WORKGROUP_SIZE: u32 = 64;
+
 #[derive(Clone, Copy, Debug)]
 pub struct RayTraceMaterial {
     pub colour: Vector3,
@@ -93,7 +95,7 @@ pub struct RayTracePipeine {
 
     ray_data: (Subbuffer<[raytrace_shader::Ray]>, u32),
     sphere_data: (Subbuffer<[raytrace_shader::Sphere]>, u32),
-    sample_data: (f32, u32, u32), // jitter_size, num_samples, max_bounces
+    sample_data: (f32, u32, u32, bool), // jitter_size, num_samples, max_bounces, use_environment_lighting
     mesh_data: (Subbuffer<[raytrace_shader::Triangle]>, Subbuffer<[raytrace_shader::Mesh]>, u32)
 }
 
@@ -140,7 +142,7 @@ impl RayTracePipeine {
 
             ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
             sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
-            sample_data: (0.0, 1, 1),
+            sample_data: (0.0, 1, 1, true),
             mesh_data: (null_tris, null_meshes, 0),
         }
     }
@@ -211,6 +213,7 @@ impl RayTracePipeine {
         samples_per_pixel: u32,
         jitter_size: f32,
         max_bounces: u32,
+        use_environment_lighting: bool
     ) {
         let viewport_width = viewport_height * (self.image_size[0] as f32 / self.image_size[1] as f32);
 
@@ -250,7 +253,7 @@ impl RayTracePipeine {
         let num_rays = rays.len() as u32;
         self.ray_data = (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays);
         // self.pixel_dims = [viewport_width / self.image_size[0] as f32, viewport_height / self.image_size[1] as f32];
-        self.sample_data = (jitter_size, samples_per_pixel, max_bounces);
+        self.sample_data = (jitter_size, samples_per_pixel, max_bounces, use_environment_lighting);
     }
 
     pub fn update_spheres(
@@ -328,7 +331,7 @@ impl RayTracePipeine {
         )
         .unwrap();
         
-        let to_process = ((self.ray_data.1 - 1)as u32 / 64) * 64 + 64;
+        let to_process = (self.ray_data.1 - 1) as u32 / WORKGROUP_SIZE + 1;
 
         let push_constants = raytrace_shader::PushConstants {
             cam_pos: camera.position.extend().into(),
@@ -339,7 +342,7 @@ impl RayTracePipeine {
             num_samples: self.sample_data.1 as i32,
             jitter_size: self.sample_data.0,
             max_bounces: self.sample_data.2 as i32,
-            use_environment_light: true as u32,
+            use_environment_light: self.sample_data.3 as u32,
         };
 
 
@@ -347,7 +350,7 @@ impl RayTracePipeine {
             .bind_pipeline_compute(self.compute_pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Compute, pipeline_layout.clone(), 0, set)
             .push_constants(pipeline_layout.clone(), 0, push_constants)
-            .dispatch([to_process / 64, 1, 1])
+            .dispatch([to_process, 1, 1])
             .unwrap();
     }
 

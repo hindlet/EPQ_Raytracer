@@ -48,7 +48,7 @@ vec3 RandomPointOnHemisphere(inout uint state, vec3 normal) {
 
 struct RayTracingMaterial {
     vec4 colour;
-    vec4 emission; /// vec3 colour, float strength at 1m
+    vec4 emission; /// vec3 colour, float strength
     vec4 settings; // roughness, metalic
 };
 
@@ -282,18 +282,26 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
             ray_pos = hit.hit_pos;
             ray_dir = adjust_dir(ray_dir, hit.hit_normal, hit.hit_mat, state);
             
+            vec3 emitted_light = vec3(hit.hit_mat.emission) * hit.hit_mat.emission.w;
+            light += emitted_light * colour;
             colour *= vec3(hit.hit_mat.colour);
-            // colour *= 0.5;
+
+            // Random early exit if ray colour is nearly 0 (can't contribute much to final result)
+            float p = max(colour.x, max(colour.y, colour.z));
+            if (scaleToRange01(hash(state)) >= p) {
+                break;
+            }
+            // colour *= 1.0f / p; 
         }
         else {
-            light += environment_light(ray_dir) * colour_to_gamma_two(colour);
+            light += environment_light(ray_dir);
             break;
         }
     }
 
     // light = environment_light(ray_dir);
 
-    return light;
+    return light * colour_to_gamma_two(colour);
 }
 
 
