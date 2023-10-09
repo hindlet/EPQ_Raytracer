@@ -1,8 +1,10 @@
 mod texture_draw_pipeline;
 mod raytrace_pipeline;
+mod image_combiner;
 
 pub use texture_draw_pipeline::*;
 pub use raytrace_pipeline::*;
+pub use image_combiner::*;
 
 use std::sync::Arc;
 use graphics::*;

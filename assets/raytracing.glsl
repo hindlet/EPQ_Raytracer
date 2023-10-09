@@ -141,6 +141,7 @@ layout(push_constant) uniform PushConstants {
     float jitter_size;
     int max_bounces;
     bool use_environment_light;
+    uint rng_offset;
 
 } push_constants;
 
@@ -338,7 +339,9 @@ void main() {
     }
 
     vec3 colour = vec3(0);
-    uint state = id;
+    uint state = push_constants.rng_offset;
+    hash(state);
+    state += id;
     for (int i = 0; i < push_constants.num_samples; i++) {
         
         vec3 dir = get_ray_dir(vec3(rays[id].sample_centre), state);

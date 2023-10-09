@@ -181,7 +181,8 @@ impl RayTracePipeine {
             size_of::<i32>() + // num_samples;
             size_of::<f32>() + // jitter_size;
             size_of::<i32>() + // max_bounces;
-            size_of::<u32>() // use_environment_light
+            size_of::<u32>() + // use_environment_light
+            size_of::<u32>() // rng_offset
         ;
 
 
@@ -286,6 +287,7 @@ impl RayTracePipeine {
         &mut self,
         before_future: Box<dyn GpuFuture>,
         camera: &Camera,
+        rng_offset: u32,
     ) -> Box<dyn GpuFuture> {
 
         let mut builder = AutoCommandBufferBuilder::primary(
@@ -294,7 +296,7 @@ impl RayTracePipeine {
             CommandBufferUsage::OneTimeSubmit,
         ).unwrap();
 
-        self.dispatch(&mut builder, camera);
+        self.dispatch(&mut builder, camera, rng_offset);
 
 
         let command_buffer = builder.build().unwrap();
@@ -315,6 +317,7 @@ impl RayTracePipeine {
         PrimaryAutoCommandBuffer,
         Arc<StandardCommandBufferAllocator>>,
         camera: &Camera,
+        rng_offset: u32
     ) {
         let pipeline_layout = self.compute_pipeline.layout();
         let desc_layout = pipeline_layout.set_layouts().get(0).unwrap();
@@ -343,6 +346,7 @@ impl RayTracePipeine {
             jitter_size: self.sample_data.0,
             max_bounces: self.sample_data.2 as i32,
             use_environment_light: self.sample_data.3 as u32,
+            rng_offset: rng_offset
         };
 
 
