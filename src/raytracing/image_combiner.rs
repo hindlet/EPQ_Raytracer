@@ -10,8 +10,8 @@ mod image_combine_shader {
 
 
 pub struct ImageCombiner {
-    images: Vec<DeviceImageView>,
-    combined_image: DeviceImageView,
+    image: DeviceImageView,
+    image_count: u32,
     image_size: [u32; 2],
 
     compute_queue: Arc<Queue>,
@@ -38,7 +38,7 @@ impl ImageCombiner {
             |_| {},
         ).unwrap();
 
-        let combined_image = StorageImage::general_purpose_image_view(
+        let image = StorageImage::general_purpose_image_view(
             context.memory_allocator(),
             context.compute_queue().clone(),
             image_size,
@@ -47,8 +47,8 @@ impl ImageCombiner {
         ).unwrap();
 
         ImageCombiner {
-            images: Vec::new(),
-            combined_image: combined_image,
+            image: image,
+            image_count: 0,
             compute_queue: context.graphics_queue().clone(),
             compute_pipeline: pipeline,
             image_size,
@@ -58,20 +58,15 @@ impl ImageCombiner {
     }
 
 
-    pub fn add_image(&mut self, image: DeviceImageView) {
-        self.images.push(image);
-    }
-
     pub fn image(&self) -> DeviceImageView {
-        self.combined_image.clone()
+        self.image.clone()
     }
 
-    pub fn combine(
+    pub fn next_frame(
         &mut self,
+        next_image: DeviceImageView,
         before_future: Box<dyn GpuFuture>,
     ) -> Box<dyn GpuFuture> {
-
-        if self.images.len() == 0 {return before_future;}
 
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
@@ -81,9 +76,8 @@ impl ImageCombiner {
 
         let group_number = (self.image_size[0] * self.image_size[1] - 1) / 256 + 1;
 
-        for i in 0..self.images.len() {
-            self.dispatch(&mut builder, &self.images[i], i as u32, group_number);
-        }
+        self.dispatch(&mut builder, next_image, self.image_count, group_number);
+        self.image_count += 1;
 
         let command_buffer = builder.build().unwrap();
         let after_future = before_future
@@ -100,8 +94,8 @@ impl ImageCombiner {
         builder: &mut AutoCommandBufferBuilder<
         PrimaryAutoCommandBuffer,
         Arc<StandardCommandBufferAllocator>>,
-        image: &DeviceImageView,
-        image_index: u32,
+        image: DeviceImageView,
+        frame_num: u32,
         group_number: u32
     ) {
 
@@ -111,13 +105,13 @@ impl ImageCombiner {
             &self.descriptor_set_allocator,
             desc_layout.clone(),
             [
-                WriteDescriptorSet::image_view(0, self.combined_image.clone()),
-                WriteDescriptorSet::image_view(1, image.clone())
+                WriteDescriptorSet::image_view(0, self.image.clone()),
+                WriteDescriptorSet::image_view(1, image)
             ]
         ).unwrap();
 
         let push_constants = image_combine_shader::PushConstants {
-            num_images: image_index,
+            frame: frame_num,
             image_width: self.image_size[0],
             image_height: self.image_size[1]
         };
