@@ -11,7 +11,6 @@ mod image_combine_shader {
 
 pub struct ImageCombiner {
     image: DeviceImageView,
-    image_count: u32,
     image_size: [u32; 2],
 
     compute_queue: Arc<Queue>,
@@ -48,7 +47,6 @@ impl ImageCombiner {
 
         ImageCombiner {
             image: image,
-            image_count: 0,
             compute_queue: context.graphics_queue().clone(),
             compute_pipeline: pipeline,
             image_size,
@@ -64,6 +62,7 @@ impl ImageCombiner {
 
     pub fn next_frame(
         &mut self,
+        frame_num: u32,
         next_image: DeviceImageView,
         before_future: Box<dyn GpuFuture>,
     ) -> Box<dyn GpuFuture> {
@@ -76,8 +75,8 @@ impl ImageCombiner {
 
         let group_number = (self.image_size[0] * self.image_size[1] - 1) / 256 + 1;
 
-        self.dispatch(&mut builder, next_image, self.image_count, group_number);
-        self.image_count += 1;
+        self.dispatch(&mut builder, next_image, frame_num, group_number);
+        println!("{:?}", frame_num);
 
         let command_buffer = builder.build().unwrap();
         let after_future = before_future

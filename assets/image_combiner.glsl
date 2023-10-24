@@ -15,14 +15,6 @@ layout(push_constant) uniform PushConstants {
     uint image_height;
 }push_constants;
 
-vec4 saturate(vec4 initial) {
-    return vec4(
-        clamp(initial.x, 0, 1),
-        clamp(initial.y, 0, 1),
-        clamp(initial.z, 0, 1),
-        clamp(initial.w, 0, 1)
-    );
-}
 
 
 
@@ -34,12 +26,12 @@ void main() {
         return;
     }
 
-    float weight = 1 / (push_constants.frame + 1);
     ivec2 pos = ivec2(id % push_constants.image_width, id / push_constants.image_width);
 
-    vec4 col = imageLoad(current_image, pos) * weight;
-    col += imageLoad(new_image, pos) * (1 - weight);
+    vec3 prev_col = imageLoad(current_image, pos).xyz;
+    vec3 new_col = imageLoad(new_image, pos).xyz;
+    vec4 col = vec4(mix(new_col, prev_col, 1 / (push_constants.frame + 1)), 1);
 
 
-    imageStore(current_image, pos, saturate(col));
+    imageStore(current_image, pos, col);
 }

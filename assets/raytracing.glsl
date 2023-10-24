@@ -339,7 +339,7 @@ void main() {
     }
 
     vec3 colour = vec3(0);
-    uint state = push_constants.rng_offset + id;
+    uint state = push_constants.rng_offset * 719393 + id;
     for (int i = 0; i < push_constants.num_samples; i++) {
         
         vec3 dir = get_ray_dir(vec3(rays[id].sample_centre), state);
