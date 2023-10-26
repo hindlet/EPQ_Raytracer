@@ -1,7 +1,7 @@
 #version 460
 
 
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 
 layout(set = 0, binding = 0, rgba8) uniform image2D current_image;
@@ -20,18 +20,23 @@ layout(push_constant) uniform PushConstants {
 
 void main() {
 
-    uint id = gl_GlobalInvocationID.x;
+    uint x = gl_GlobalInvocationID.x;
+    uint y = gl_GlobalInvocationID.y;
 
-    if (id >= push_constants.image_width * push_constants.image_height) {
+    if (x > push_constants.image_width || y > push_constants.image_height) {
         return;
     }
 
-    ivec2 pos = ivec2(id % push_constants.image_width, id / push_constants.image_width);
+    ivec2 pos = ivec2(x, y);
+
+    if (push_constants.frame == 0) {
+        imageStore(current_image, pos, vec4(0, 0, 0, 1));
+        return;
+    }
 
     vec3 prev_col = imageLoad(current_image, pos).xyz;
     vec3 new_col = imageLoad(new_image, pos).xyz;
-    vec4 col = vec4(mix(new_col, prev_col, 1 / (push_constants.frame + 1)), 1);
+    vec3 col = mix(new_col, prev_col, 1 / (push_constants.frame + 1));
 
-
-    imageStore(current_image, pos, col);
+    imageStore(current_image, pos, vec4(col, 1));
 }

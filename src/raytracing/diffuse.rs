@@ -1,7 +1,7 @@
 use super::*;
 
 
-mod image_combine_shader {
+mod diffuse_shader {
     graphics::shader!{
         ty: "compute",
         path: "assets/image_combiner.glsl"
@@ -9,7 +9,7 @@ mod image_combine_shader {
 }
 
 
-pub struct ImageCombiner {
+pub struct DiffusePipeline {
     image: DeviceImageView,
     image_size: [u32; 2],
 
@@ -20,7 +20,7 @@ pub struct ImageCombiner {
 }
 
 
-impl ImageCombiner {
+impl DiffusePipeline {
 
     pub fn new(
         context: &VulkanoContext,
@@ -31,7 +31,7 @@ impl ImageCombiner {
 
         let pipeline = ComputePipeline::new(
             context.device().clone(),
-            image_combine_shader::load(context.device().clone()).unwrap().entry_point("main").unwrap(),
+            diffuse_shader::load(context.device().clone()).unwrap().entry_point("main").unwrap(),
             &(),
             None,
             |_| {},
@@ -45,7 +45,7 @@ impl ImageCombiner {
             ImageUsage::SAMPLED | ImageUsage::STORAGE | ImageUsage::TRANSFER_DST,
         ).unwrap();
 
-        ImageCombiner {
+        DiffusePipeline {
             image: image,
             compute_queue: context.graphics_queue().clone(),
             compute_pipeline: pipeline,
@@ -73,10 +73,12 @@ impl ImageCombiner {
             CommandBufferUsage::OneTimeSubmit
         ).unwrap();
 
-        let group_number = (self.image_size[0] * self.image_size[1] - 1) / 256 + 1;
+        let group_numbers = [
+            (self.image_size[0] - 1) / 32 + 1,
+            (self.image_size[1] - 1) / 32 + 1,
+        ];
 
-        self.dispatch(&mut builder, next_image, frame_num, group_number);
-        println!("{:?}", frame_num);
+        self.dispatch(&mut builder, next_image, frame_num, group_numbers);
 
         let command_buffer = builder.build().unwrap();
         let after_future = before_future
@@ -95,7 +97,7 @@ impl ImageCombiner {
         Arc<StandardCommandBufferAllocator>>,
         image: DeviceImageView,
         frame_num: u32,
-        group_number: u32
+        group_numbers: [u32; 2]
     ) {
 
         let pipeline_layout = self.compute_pipeline.layout();
@@ -109,7 +111,7 @@ impl ImageCombiner {
             ]
         ).unwrap();
 
-        let push_constants = image_combine_shader::PushConstants {
+        let push_constants = diffuse_shader::PushConstants {
             frame: frame_num,
             image_width: self.image_size[0],
             image_height: self.image_size[1]
@@ -119,7 +121,7 @@ impl ImageCombiner {
             .bind_pipeline_compute(self.compute_pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Compute, pipeline_layout.clone(), 0, set)
             .push_constants(pipeline_layout.clone(), 0, push_constants)
-            .dispatch([group_number, 1, 1])
+            .dispatch([group_numbers[0], group_numbers[1], 1])
             .unwrap();
     }
 

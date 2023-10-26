@@ -8,8 +8,17 @@ mod raytrace_shader {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clone> {
+    pub sample_settings: (f32, u32, u32, bool), // jitter_size, num_samples, max_bounces, use_environment_lighting
+    pub sphere_data: Vec<Sphere>,
+    pub mesh_data: Vec<RayTracingMesh<T>>,
 
-const WORKGROUP_SIZE: u32 = 64;
+    pub camera_focal_length: f32,
+    pub viewport_height: f32,
+    pub up: [f32; 3],
+}
+
 
 #[derive(Clone, Copy, Debug)]
 pub struct RayTraceMaterial {
@@ -41,7 +50,7 @@ impl Default for RayTraceMaterial {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Sphere {
     pub centre: Vector3,
     pub radius: f32,
@@ -101,11 +110,12 @@ pub struct RayTracePipeine {
 
 
 impl RayTracePipeine {
-    pub fn new(
+    pub fn new<T: graphics::Position + BufferContents + Copy + Clone>(
         context: &VulkanoContext,
         command_buffer_allocator: &Arc<StandardCommandBufferAllocator>,
         descriptor_set_allocator: &Arc<StandardDescriptorSetAllocator>,
         image_size: [u32; 2],
+        settings: RayTracerSettings<T>
     ) -> Self {
 
         let pipeline = ComputePipeline::with_pipeline_layout(
@@ -124,12 +134,9 @@ impl RayTracePipeine {
             ImageUsage::SAMPLED | ImageUsage::STORAGE | ImageUsage::TRANSFER_DST,
         ).unwrap();
 
-        let null_ray = raytrace_shader::Ray {
-            sample_centre: [0.0, 0.0, 0.0, 0.0],
-            img_pos: [0.0, 0.0, 0.0, 0.0]
-        };
-        let null_sphere: raytrace_shader::Sphere = Sphere::default().into();
-        let (null_tris, null_meshes) = transform_meshes(context, &vec![get_null_mesh()]); //CAUSES CRASH BC EMPTY BUFFER
+        let ray_data = create_ray_subbuffer(context, image_size, settings.camera_focal_length, settings.viewport_height, settings.up);
+        let sphere_data = create_sphere_subbuffer(context, settings.sphere_data);
+        let mesh_data = create_mesh_subbuffer(context, &settings.mesh_data);
         
 
         RayTracePipeine {
@@ -140,10 +147,10 @@ impl RayTracePipeine {
             image: image,
             image_size: image_size,
 
-            ray_data: (create_shader_data_buffer(vec![null_ray], context, BufferType::Storage), 0),
-            sphere_data: (create_shader_data_buffer(vec![null_sphere], context, BufferType::Storage), 0),
-            sample_data: (0.0, 1, 1, true),
-            mesh_data: (null_tris, null_meshes, 0),
+            ray_data: ray_data,
+            sphere_data: sphere_data,
+            sample_data: settings.sample_settings,
+            mesh_data: mesh_data,
         }
     }
 
@@ -182,7 +189,10 @@ impl RayTracePipeine {
             size_of::<f32>() + // jitter_size;
             size_of::<i32>() + // max_bounces;
             size_of::<u32>() + // use_environment_light
-            size_of::<u32>() // rng_offset
+            size_of::<u32>() + // rng_offset
+            size_of::<u32>() + // init
+            size_of::<u32>() + // width
+            size_of::<u32>() // height
         ;
 
 
@@ -204,84 +214,6 @@ impl RayTracePipeine {
         self.image.clone()
     }
 
-    /// TODO: Have rays relative to dir (1, 0, 0) and then transform in shader from cam dir
-    pub fn init_data(
-        &mut self,
-        context: &VulkanoContext,
-        camera_focal_length: f32,
-        viewport_height: f32,
-        up: impl Into<Vector3>,
-        samples_per_pixel: u32,
-        jitter_size: f32,
-        max_bounces: u32,
-        use_environment_lighting: bool
-    ) {
-        let viewport_width = viewport_height * (self.image_size[0] as f32 / self.image_size[1] as f32);
-
-        let viewport_x = up.into().cross(Vector3::X).normalised();
-        let viewport_y = viewport_x.cross(Vector3::X).normalised();
-        let viewport_upper_left = Vector3::ZERO + Vector3::X * camera_focal_length - (viewport_x * viewport_width - viewport_y * viewport_height) * 0.5;
-
-        let pixel_x = viewport_x * viewport_width / self.image_size[0] as f32;
-        let pixel_y = viewport_y * viewport_height / self.image_size[1] as f32;
-
-        let first_ray = viewport_upper_left + (pixel_x - pixel_y) * 0.5;
-        let mut ray_data: Vec<([f32; 4], [f32; 4])> = Vec::new();
-
-        for y in 0..self.image_size[1] {
-            for x in 0..self.image_size[0] {
-                let ray_pos = first_ray + pixel_x * x as f32 - pixel_y * y as f32;
-                // if (x == 0 && y == 0) || (x == self.image_size[0] - 1 && y == 0) || (x == 0 && y == self.image_size[1] - 1) || (x == self.image_size[0] - 1 && y == self.image_size[1] - 1) {
-                //     println!("{:?}", ray_pos);
-                // }
-                ray_data.push((
-                    Vector2::new(x as f32, (self.image_size[1] - y) as f32).extend().extend().into(),
-                    ray_pos.extend().into(),
-                ));
-            }
-        }
-
-
-        let mut rays: Vec<raytrace_shader::Ray> = Vec::new();
-        for datum in ray_data {
-            // println!("{:?}", datum.1);
-            rays.push(raytrace_shader::Ray {
-                img_pos: datum.0,
-                sample_centre: datum.1,
-            });
-        }
-
-        let num_rays = rays.len() as u32;
-        self.ray_data = (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays);
-        // self.pixel_dims = [viewport_width / self.image_size[0] as f32, viewport_height / self.image_size[1] as f32];
-        self.sample_data = (jitter_size, samples_per_pixel, max_bounces, use_environment_lighting);
-    }
-
-    pub fn update_spheres(
-        &mut self,
-        context: &VulkanoContext,
-        sphere_data: Vec<Sphere>
-    ) {
-        let mut spheres: Vec<raytrace_shader::Sphere> = Vec::new();
-
-        for sphere in sphere_data.iter() {
-            spheres.push((*sphere).into());
-        }
-
-        let num_spheres = spheres.len() as u32;
-        self.sphere_data = (create_shader_data_buffer(spheres, context, BufferType::Storage), num_spheres);
-    }
-
-    pub fn update_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
-        &mut self,
-        context: &VulkanoContext,
-        mesh_data: &Vec<RayTracingMesh<T>>
-    ) {
-        let num_meshes = mesh_data.len() as u32;
-        // println!("{:?}", num_meshes);
-        let (tri_buffer, mesh_buffer) = transform_meshes(context, mesh_data);
-        self.mesh_data = (tri_buffer, mesh_buffer, num_meshes);
-    }
 
     pub fn compute(
         &mut self,
@@ -296,7 +228,7 @@ impl RayTracePipeine {
             CommandBufferUsage::OneTimeSubmit,
         ).unwrap();
 
-        self.dispatch(&mut builder, camera, rng_offset);
+        self.dispatch(&mut builder, camera, rng_offset, false);
 
 
         let command_buffer = builder.build().unwrap();
@@ -306,7 +238,32 @@ impl RayTracePipeine {
             .then_signal_fence_and_flush()
             .unwrap();
 
-        // after_future.wait(None).unwrap();
+            
+        after_future.boxed()
+    }
+
+    // call the init to fill the screen with black
+    pub fn init(
+        &self,
+        before_future: Box<dyn GpuFuture>,
+    ) -> Box<dyn GpuFuture> {
+        
+        let mut builder = AutoCommandBufferBuilder::primary(
+            &self.command_buffer_allocator,
+            self.compute_queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        ).unwrap();
+
+        self.dispatch(&mut builder, &Camera::new(None, None, None, None), 0, true);
+
+
+        let command_buffer = builder.build().unwrap();
+        let after_future = before_future
+            .then_execute(self.compute_queue.clone(), command_buffer)
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
+
 
         after_future.boxed()
     }
@@ -317,7 +274,8 @@ impl RayTracePipeine {
         PrimaryAutoCommandBuffer,
         Arc<StandardCommandBufferAllocator>>,
         camera: &Camera,
-        rng_offset: u32
+        rng_offset: u32,
+        init: bool
     ) {
         let pipeline_layout = self.compute_pipeline.layout();
         let desc_layout = pipeline_layout.set_layouts().get(0).unwrap();
@@ -334,7 +292,8 @@ impl RayTracePipeine {
         )
         .unwrap();
         
-        let to_process = (self.ray_data.1 - 1) as u32 / WORKGROUP_SIZE + 1;
+        let to_process_x = (self.image_size[0] - 1) / 32 + 1;
+        let to_process_y = (self.image_size[1] - 1) / 32 + 1;
 
         let push_constants = raytrace_shader::PushConstants {
             cam_pos: camera.position.extend().into(),
@@ -346,7 +305,10 @@ impl RayTracePipeine {
             jitter_size: self.sample_data.0,
             max_bounces: self.sample_data.2 as i32,
             use_environment_light: self.sample_data.3 as u32,
-            rng_offset: rng_offset
+            rng_offset: rng_offset,
+            init: init as u32,
+            width: self.image_size[0],
+            height: self.image_size[1]
         };
 
 
@@ -354,7 +316,7 @@ impl RayTracePipeine {
             .bind_pipeline_compute(self.compute_pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Compute, pipeline_layout.clone(), 0, set)
             .push_constants(pipeline_layout.clone(), 0, push_constants)
-            .dispatch([to_process, 1, 1])
+            .dispatch([to_process_x, to_process_y, 1])
             .unwrap();
     }
 
@@ -378,11 +340,98 @@ impl RayTracePipeine {
     }
 }
 
+// creates the rays sent to the shader, they are centered around (1, 0, 0) and get transformed there
+fn create_ray_subbuffer(
+    context: &VulkanoContext,
+    image_size: [u32; 2],
+    camera_focal_length: f32,
+    viewport_height: f32,
+    up: impl Into<Vector3>,
+) -> (Subbuffer<[raytrace_shader::Ray]>, u32) {
 
-fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
+    // zero length protection
+    if image_size[0] == 0 || image_size[1] == 0 {
+        let null_ray = vec![raytrace_shader::Ray {
+            sample_centre: [0.0, 0.0, 0.0, 0.0],
+        }];
+        return (create_shader_data_buffer(null_ray, context, BufferType::Storage), 0);
+    }
+
+
+
+    let viewport_width = viewport_height * (image_size[0] as f32 / image_size[1] as f32);
+
+    let viewport_x = up.into().cross(Vector3::X).normalised();
+    let viewport_y = viewport_x.cross(Vector3::X).normalised();
+    let viewport_upper_left = Vector3::ZERO + Vector3::X * camera_focal_length - (viewport_x * viewport_width + viewport_y * viewport_height) * 0.5;
+
+    let pixel_x = viewport_x * viewport_width / image_size[0] as f32;
+    let pixel_y = viewport_y * viewport_height / image_size[1] as f32;
+
+    let first_ray = viewport_upper_left + (pixel_x + pixel_y) * 0.5;
+    let mut ray_centres: Vec<[f32; 4]> = Vec::new();
+
+    for y in 0..image_size[1] {
+        for x in 0..image_size[0] {
+            let ray_pos = first_ray + pixel_x * x as f32 + pixel_y * y as f32;
+            ray_centres.push(
+                ray_pos.extend().into()
+            );
+        }
+    }
+
+
+    let mut rays: Vec<raytrace_shader::Ray> = Vec::new();
+    for centre in ray_centres {
+        rays.push(raytrace_shader::Ray {
+            sample_centre: centre,
+        });
+    }
+
+    let num_rays = rays.len() as u32;
+    (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays)
+}
+
+
+fn create_sphere_subbuffer(
+    context: &VulkanoContext,
+    sphere_data: Vec<Sphere>
+) -> (Subbuffer<[raytrace_shader::Sphere]>, u32) {
+
+    // zero length protection
+    if sphere_data.len() == 0 {
+        let null_sphere: Vec<raytrace_shader::Sphere> = vec![Sphere::default().into()];
+        return (create_shader_data_buffer(null_sphere, context, BufferType::Storage), 0);
+    }
+
+    let mut spheres: Vec<raytrace_shader::Sphere> = Vec::new();
+
+    for sphere in sphere_data.iter() {
+        spheres.push((*sphere).into());
+    }
+
+    let num_spheres = spheres.len() as u32;
+    (create_shader_data_buffer(spheres, context, BufferType::Storage), num_spheres)
+}
+
+
+fn create_mesh_subbuffer<T: graphics::Position + BufferContents + Copy + Clone>(
     context: &VulkanoContext,
     meshes: &Vec<RayTracingMesh<T>>,
-) -> (Subbuffer<[raytrace_shader::Triangle]>, Subbuffer<[raytrace_shader::Mesh]>) {
+) -> (Subbuffer<[raytrace_shader::Triangle]>, Subbuffer<[raytrace_shader::Mesh]>, u32) {
+
+    // zero length protection
+    let (tris, mesh_data) = if meshes.len() == 0 {transform_meshes(&vec![get_null_mesh()])} else {transform_meshes(meshes)};
+
+    let tri_buffer = create_shader_data_buffer(tris, context, BufferType::Storage);
+    let mesh_buffer = create_shader_data_buffer(mesh_data, context, BufferType::Storage);
+    (tri_buffer, mesh_buffer, meshes.len() as u32)
+}
+
+fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
+    meshes: &Vec<RayTracingMesh<T>>,
+) -> (Vec<raytrace_shader::Triangle>, Vec<raytrace_shader::Mesh>){
+
     let mut tri_count = 0;
     let mut tris: Vec<raytrace_shader::Triangle> = Vec::new();
     let mut mesh_data: Vec<raytrace_shader::Mesh> = Vec::new();
@@ -427,10 +476,7 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
             max_point: [max_x, max_y, max_z]
         });
         tri_count += num_tris;
-
     }
 
-    let tri_buffer = create_shader_data_buffer(tris, context, BufferType::Storage);
-    let mesh_buffer = create_shader_data_buffer(mesh_data, context, BufferType::Storage);
-    (tri_buffer, mesh_buffer)
+    (tris, mesh_data)
 }

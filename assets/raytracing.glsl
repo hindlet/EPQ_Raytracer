@@ -4,7 +4,7 @@
 #define M_PI 3.1415926535897932384626433832795
 #define UINT_MAX 4294967295
 
-layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 /// RANDOM FUNCTIONS
 
@@ -64,7 +64,6 @@ RayTracingMaterial empty_mat() {
 
 struct Ray {
     vec4 sample_centre; // relative to line (1, 0, 0)
-    vec4 img_pos;
 };
 
 
@@ -142,6 +141,10 @@ layout(push_constant) uniform PushConstants {
     int max_bounces;
     bool use_environment_light;
     uint rng_offset;
+
+    bool init;
+    uint width;
+    uint height;
 
 } push_constants;
 
@@ -332,11 +335,19 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
 
 
 void main() {
-    uint id = gl_GlobalInvocationID.x;
+    uint x = gl_GlobalInvocationID.x;
+    uint y = gl_GlobalInvocationID.y;
 
-    if (id >= push_constants.num_rays) {
+    if (x > push_constants.width || y > push_constants.height) {
         return;
     }
+
+    if (push_constants.init) {
+        imageStore(img, ivec2(x, y), vec4(0.0, 0.0, 0.0, 1.0));
+        return;
+    }
+
+    uint id = x + y * push_constants.width;
 
     vec3 colour = vec3(0);
     uint state = push_constants.rng_offset * 719393 + id;
@@ -348,5 +359,5 @@ void main() {
     }
 
     colour /= push_constants.num_samples;
-    imageStore(img, ivec2(rays[id].img_pos.xy), vec4(colour, 1.0));
+    imageStore(img, ivec2(x, y), vec4(colour, 1.0));
 }
