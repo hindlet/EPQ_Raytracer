@@ -347,6 +347,14 @@ void main() {
         return;
     }
 
+    // if (push_constants.rng_offset % 2 == 0) {
+    //     imageStore(img, ivec2(x, y), vec4(0.0, 0.0, 1.0, 1.0));
+    //     return;
+    // } else {
+    //     imageStore(img, ivec2(x, y), vec4(1.0, 0.0, 1.0, 1.0));
+    //     return;
+    // }
+
     uint id = x + y * push_constants.width;
 
     vec3 colour = vec3(0);

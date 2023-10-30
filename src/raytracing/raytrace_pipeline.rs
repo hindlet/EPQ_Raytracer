@@ -8,6 +8,8 @@ mod raytrace_shader {
     }
 }
 
+
+/// Settings to be passed into the raytrace pipeline on creation
 #[derive(Clone, Debug)]
 pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clone> {
     pub sample_settings: (f32, u32, u32, bool), // jitter_size, num_samples, max_bounces, use_environment_lighting
@@ -20,6 +22,7 @@ pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clo
 }
 
 
+/// A Raytracing material
 #[derive(Clone, Copy, Debug)]
 pub struct RayTraceMaterial {
     pub colour: Vector3,
@@ -50,6 +53,7 @@ impl Default for RayTraceMaterial {
     }
 }
 
+/// Sphere representation
 #[derive(Clone, Copy, Debug)]
 pub struct Sphere {
     pub centre: Vector3,
@@ -77,6 +81,8 @@ impl Default for Sphere {
     }
 }
 
+
+/// Mesh Representation
 #[derive(Clone, Debug)]
 pub struct RayTracingMesh<T: graphics::Position + BufferContents + Copy + Clone> {
     pub mesh: Mesh<T>,
@@ -93,7 +99,7 @@ fn get_null_mesh() -> RayTracingMesh<PositionVertex> {
 }
 
 
-
+/// The raytracing pipeline
 pub struct RayTracePipeine {
     compute_queue: Arc<Queue>,
     compute_pipeline: Arc<ComputePipeline>,
@@ -110,6 +116,7 @@ pub struct RayTracePipeine {
 
 
 impl RayTracePipeine {
+    /// creates a new raytrace pipeline with the given settings
     pub fn new<T: graphics::Position + BufferContents + Copy + Clone>(
         context: &VulkanoContext,
         command_buffer_allocator: &Arc<StandardCommandBufferAllocator>,
@@ -154,6 +161,7 @@ impl RayTracePipeine {
         }
     }
 
+    /// return the pipeline layout, maually adjusted
     fn get_pipeline_layout(
         context: &VulkanoContext
     ) -> Arc<PipelineLayout> {
@@ -209,12 +217,13 @@ impl RayTracePipeine {
         ).unwrap()
     }
 
-
+    /// returns the pipeline image
     pub fn image(&self) -> DeviceImageView {
         self.image.clone()
     }
 
 
+    /// next pass of raytracing
     pub fn compute(
         &mut self,
         before_future: Box<dyn GpuFuture>,
@@ -268,6 +277,7 @@ impl RayTracePipeine {
         after_future.boxed()
     }
 
+    // send data to the gpu
     fn dispatch(
         &self,
         builder: &mut AutoCommandBufferBuilder<
@@ -393,6 +403,7 @@ fn create_ray_subbuffer(
 }
 
 
+/// transformes list of spheres to subbuffer of raytrace spheres
 fn create_sphere_subbuffer(
     context: &VulkanoContext,
     sphere_data: Vec<Sphere>
@@ -414,7 +425,7 @@ fn create_sphere_subbuffer(
     (create_shader_data_buffer(spheres, context, BufferType::Storage), num_spheres)
 }
 
-
+/// transformes list of meshes to subbuffer of raytrace meshes
 fn create_mesh_subbuffer<T: graphics::Position + BufferContents + Copy + Clone>(
     context: &VulkanoContext,
     meshes: &Vec<RayTracingMesh<T>>,
@@ -428,6 +439,7 @@ fn create_mesh_subbuffer<T: graphics::Position + BufferContents + Copy + Clone>(
     (tri_buffer, mesh_buffer, meshes.len() as u32)
 }
 
+/// transform meshes into triangles and mesh info
 fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
     meshes: &Vec<RayTracingMesh<T>>,
 ) -> (Vec<raytrace_shader::Triangle>, Vec<raytrace_shader::Mesh>){

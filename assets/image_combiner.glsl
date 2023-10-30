@@ -9,6 +9,7 @@ layout(set = 0, binding = 0, rgba8) uniform image2D current_image;
 layout(set = 0, binding = 1, rgba8) uniform image2D new_image;
 
 
+
 layout(push_constant) uniform PushConstants {
     uint frame;
     uint image_width;
@@ -36,7 +37,8 @@ void main() {
 
     vec3 prev_col = imageLoad(current_image, pos).xyz;
     vec3 new_col = imageLoad(new_image, pos).xyz;
-    vec3 col = mix(new_col, prev_col, 1 / (push_constants.frame + 1));
+    vec3 col = (new_col + prev_col * push_constants.frame) / (push_constants.frame + 1);
+
 
     imageStore(current_image, pos, vec4(col, 1));
 }

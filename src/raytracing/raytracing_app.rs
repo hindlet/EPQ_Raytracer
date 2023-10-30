@@ -14,6 +14,7 @@ pub struct RayTracingApp<T: graphics::Position + BufferContents + Copy + Clone> 
 
 
 impl<T: graphics::Position + BufferContents + Copy + Clone> RayTracingApp<T> {
+    /// create a new raytracing app
     pub fn new(
         camera: Camera,
         settings: RayTracerSettings<T>
@@ -41,6 +42,7 @@ impl<T: graphics::Position + BufferContents + Copy + Clone> RayTracingApp<T> {
     }
 
 
+    /// intitialise all pipelines and open window
     pub fn open(
         &mut self,
         event_loop: &EventLoop<()>,
@@ -113,6 +115,7 @@ impl<T: graphics::Position + BufferContents + Copy + Clone> RayTracingApp<T> {
 }
 
 
+/// handle input like window closing and camera control
 pub fn handle_events<T: graphics::Position + BufferContents + Copy + Clone>(
     app: &mut RayTracingApp<T>,
     event_loop: &mut EventLoop<()>
@@ -121,6 +124,7 @@ pub fn handle_events<T: graphics::Position + BufferContents + Copy + Clone>(
     generic_winit_event_handling_with_camera(event_loop, &mut app.windows, &mut Vec::new(), (&mut app.camera, &id))
 }
 
+/// computes the next frame and render
 pub fn compute_then_render<T: graphics::Position + BufferContents + Copy + Clone>(
     app: &mut RayTracingApp<T>,
     frame_time: f32,

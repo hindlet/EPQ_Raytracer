@@ -27,4 +27,3 @@ use graphics::all_vulkano::{
 use graphics::all_vulkano_utils::renderer::{DeviceImageView, SwapchainImageView};
 use std::collections::BTreeMap;
 use std::mem::size_of;
-use maths::Vector2;
