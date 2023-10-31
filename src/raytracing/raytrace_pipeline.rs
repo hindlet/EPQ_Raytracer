@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use maths::{Vector3, Matrix3, Vector4};
 use super::*;
 
@@ -5,8 +7,10 @@ mod raytrace_shader {
     graphics::shader!{
         ty: "compute",
         path: "assets/raytracing.glsl",
+        custom_derives: [Debug, Clone]
     }
 }
+
 
 
 /// Settings to be passed into the raytrace pipeline on creation
@@ -21,72 +25,87 @@ pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clo
     pub up: [f32; 3],
 }
 
-
-/// A Raytracing material
-#[derive(Clone, Copy, Debug)]
-pub struct RayTraceMaterial {
-    pub colour: Vector3,
-    pub roughness: f32,
-    pub metalic: f32,
-    pub emmision: Vector4
+pub trait RayTraceMaterial {
+    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial;
 }
 
-impl Into<raytrace_shader::RayTracingMaterial> for RayTraceMaterial {
-    fn into(self) -> raytrace_shader::RayTracingMaterial {
-        let normal_colour = self.colour.normalised();
+pub struct LambertianMaterial {
+    pub colour: [f32; 3],
+}
+
+impl RayTraceMaterial for LambertianMaterial {
+    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
         raytrace_shader::RayTracingMaterial {
-            colour: [normal_colour.x, normal_colour.y, normal_colour.z, 1.0],
-            emission: self.emmision.into(),
-            settings: [self.roughness.clamp(0.0, 1.0), self.metalic.clamp(0.0, 1.0), 0.0, 0.0]
+            colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
+            emission: [0.0; 4],
+            settings: [1.0, 0.0, 0.0, 0.0]
         }
     }
 }
 
-impl Default for RayTraceMaterial {
-    fn default() -> Self {
-        RayTraceMaterial {
-            colour: Vector3::ZERO,
-            emmision: Vector4::ZERO,
-            roughness: 0.5,
-            metalic: 0.0,
+pub struct MetalMaterial {
+    pub colour: [f32; 3],
+    pub smoothness: f32,
+    pub fuzz: f32
+}
+
+impl RayTraceMaterial for MetalMaterial {
+    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
+        raytrace_shader::RayTracingMaterial {
+            colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
+            emission: [0.0; 4],
+            settings: [0.0, self.smoothness, self.fuzz, 0.0]
         }
     }
 }
+
+pub struct LightMaterial {
+    pub emission: [f32; 4]
+}
+
+impl RayTraceMaterial for LightMaterial {
+    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
+        raytrace_shader::RayTracingMaterial {
+            colour: [1.0; 4],
+            emission: self.emission,
+            settings: [0.0, 1.0, 0.0, 0.0]
+        }
+    }
+}
+
 
 /// Sphere representation
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone)]
 pub struct Sphere {
-    pub centre: Vector3,
+    pub centre: [f32; 3],
     pub radius: f32,
-    pub material: RayTraceMaterial
+    pub material: raytrace_shader::RayTracingMaterial
 }
 
 impl Into<raytrace_shader::Sphere> for Sphere {
     fn into(self) -> raytrace_shader::Sphere {
         raytrace_shader::Sphere {
-            centre: self.centre.into(),
+            centre: self.centre,
             radius: self.radius,
-            material: self.material.into()
+            material: self.material
         }
     }
 }
 
-impl Default for Sphere {
-    fn default() -> Self {
-        Sphere {
-            centre: Vector3::ZERO,
-            radius: 0.0,
-            material: RayTraceMaterial::default()
-        }
+fn get_null_sphere() -> Sphere {
+    Sphere {
+        centre: [0.0; 3],
+        radius: 0.0,
+        material: LambertianMaterial{colour: [1.0; 3]}.to_mat()
     }
 }
 
 
 /// Mesh Representation
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct RayTracingMesh<T: graphics::Position + BufferContents + Copy + Clone> {
     pub mesh: Mesh<T>,
-    pub material: RayTraceMaterial
+    pub material: raytrace_shader::RayTracingMaterial
 }
 
 fn get_null_mesh() -> RayTracingMesh<PositionVertex> {
@@ -94,7 +113,7 @@ fn get_null_mesh() -> RayTracingMesh<PositionVertex> {
     mesh.set_normals(vec![Normal{normal: [1.0; 3]}]);
     RayTracingMesh {
         mesh: mesh,
-        material: RayTraceMaterial::default()
+        material: LambertianMaterial{colour: [1.0; 3]}.to_mat()
     }
 }
 
@@ -411,14 +430,13 @@ fn create_sphere_subbuffer(
 
     // zero length protection
     if sphere_data.len() == 0 {
-        let null_sphere: Vec<raytrace_shader::Sphere> = vec![Sphere::default().into()];
-        return (create_shader_data_buffer(null_sphere, context, BufferType::Storage), 0);
+        return (create_shader_data_buffer(vec![get_null_sphere().into()], context, BufferType::Storage), 0);
     }
 
     let mut spheres: Vec<raytrace_shader::Sphere> = Vec::new();
 
     for sphere in sphere_data.iter() {
-        spheres.push((*sphere).into());
+        spheres.push(sphere.clone().into());
     }
 
     let num_spheres = spheres.len() as u32;
@@ -449,7 +467,7 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
     let mut mesh_data: Vec<raytrace_shader::Mesh> = Vec::new();
     for mesh in meshes.iter() {
 
-        let mat = mesh.material;
+        let mat = mesh.material.clone();
         let mesh = mesh.mesh.clone();
         let (mut min_x, mut min_y, mut min_z) = (f32::MAX, f32::MAX, f32::MAX);
         let (mut max_x, mut max_y, mut max_z) = (f32::MIN, f32::MIN, f32::MIN);
@@ -461,7 +479,7 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
             let c: Vector3 = mesh.vertices[mesh.indices[i + 2] as usize].pos().into();
             let edge_one = b - a;
             let edge_two = c - a;
-            let norm = edge_one.cross(edge_two);
+            let norm = edge_one.cross(edge_two).normalised();
 
             min_x = min_x.min(a.x.min(b.x.min(c.x)));
             min_y = min_y.min(a.y.min(b.y.min(c.y)));
@@ -483,7 +501,7 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
         mesh_data.push(raytrace_shader::Mesh {
             first_index: tri_count,
             len: num_tris,
-            material: mat.into(),
+            material: mat,
             min_point: [min_x, min_y, min_z],
             max_point: [max_x, max_y, max_z]
         });

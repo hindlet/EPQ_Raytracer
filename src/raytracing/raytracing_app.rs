@@ -153,13 +153,13 @@ pub fn compute_then_render<T: graphics::Position + BufferContents + Copy + Clone
     let after_raytrace = raytrace_pipeline.compute(before_pipeline_future, &app.camera, app.frame);
     let raytrace_image = raytrace_pipeline.image();
 
-    let after_diffuse = diffuse_pipeline.next_frame(app.frame, raytrace_image, after_raytrace);
-    let diffuse_image = diffuse_pipeline.image();
+    // let after_diffuse = diffuse_pipeline.next_frame(app.frame, raytrace_image, after_raytrace);
+    // let diffuse_image = diffuse_pipeline.image();
 
     let target_image = window_renderer.swapchain_image_view();
 
     let after_render = render_pipeline
-        .render(after_diffuse, diffuse_image, target_image);
+        .render(after_raytrace, raytrace_image, target_image);
 
     window_renderer.present(after_render, true);
     app.frame += 1;

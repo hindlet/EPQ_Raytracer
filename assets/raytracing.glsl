@@ -50,7 +50,7 @@ vec3 RandomPointOnHemisphere(inout uint state, vec3 normal) {
 struct RayTracingMaterial {
     vec4 colour;
     vec4 emission; /// vec3 colour, float strength
-    vec4 settings; // roughness, metalic
+    vec4 settings; // roughness, metalic, fuzz
 };
 
 RayTracingMaterial empty_mat() {
@@ -292,9 +292,16 @@ vec3 environment_light(vec3 dir) {
     return (1.0-a)*vec3(1.0) + a*vec3(0.5, 0.7, 1.0);
 }
 
+
+/// there is a problem here, idk why
 vec3 adjust_dir(vec3 dir, vec3 normal, RayTracingMaterial mat, inout uint state) {
-    vec3 scatter = normalize(lerp(normal, reflect(dir, normal), mat.settings.y) + RandomPointOnUnitSphere(state) * mat.settings.x);
-    return scatter;
+
+    vec3 diffuse_dir = normalize(normal + RandomPointOnUnitSphere(state) * mat.settings.x); // lambertian
+    vec3 specular_dir = reflect(dir, normal); // metal
+    vec3 fuzz = RandomPointOnUnitSphere(state) * mat.settings.z; // metal fuzz
+    
+    vec3 new_dir = normalize(mix(diffuse_dir, specular_dir, mat.settings.y) + fuzz);
+    return new_dir;
 }
 
 
