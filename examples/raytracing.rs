@@ -197,6 +197,18 @@ fn load_cube_scene() -> RayTracingApp<PositionVertex>{
         },
     ];
 
+    let sphere_data = vec![
+        Sphere{
+            centre: [0.0, 0.0, 0.0].into(),
+            radius: 1.0,
+            material: MetalMaterial {
+                smoothness: 1.0,
+                fuzz: 0.0,
+                colour: [1.0, 1.0, 1.0].into(),
+            }.to_mat()
+        },
+    ];
+
 
     let cam = Camera::new(Some([3.0, 1.5, 0.0]), Some([-1.0, 0.0, 0.0]), None, None);
     let up = cam.up;
@@ -204,7 +216,7 @@ fn load_cube_scene() -> RayTracingApp<PositionVertex>{
         cam,
         RayTracerSettings {
             sample_settings: (0.005, 10, 50, true),
-            sphere_data: Vec::new(),
+            sphere_data: sphere_data,
             mesh_data: mesh_data,
             camera_focal_length: 1.0,
             viewport_height: 2.0,

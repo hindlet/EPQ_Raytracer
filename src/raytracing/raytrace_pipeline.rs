@@ -508,5 +508,7 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
         tri_count += num_tris;
     }
 
+    println!("{:?}", tris);
+    println!("{:?}", mesh_data); 
     (tris, mesh_data)
 }
