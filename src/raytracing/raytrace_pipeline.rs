@@ -479,7 +479,7 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
             let c: Vector3 = mesh.vertices[mesh.indices[i + 2] as usize].pos().into();
             let edge_one = b - a;
             let edge_two = c - a;
-            let norm = edge_one.cross(edge_two).normalised();
+            let norm = edge_one.cross(edge_two);
 
             min_x = min_x.min(a.x.min(b.x.min(c.x)));
             min_y = min_y.min(a.y.min(b.y.min(c.y)));
