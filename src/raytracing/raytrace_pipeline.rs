@@ -73,6 +73,20 @@ impl RayTraceMaterial for LightMaterial {
     }
 }
 
+pub struct InvisLightMaterial {
+    pub emission: [f32; 4]
+}
+
+impl RayTraceMaterial for InvisLightMaterial {
+    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
+        raytrace_shader::RayTracingMaterial {
+            colour: [1.0; 4],
+            emission: self.emission,
+            settings: [0.0, 1.0, 0.0, 1.0]
+        }
+    }
+}
+
 
 /// Sphere representation
 #[derive(Debug, Clone)]
@@ -508,7 +522,5 @@ fn transform_meshes<T: graphics::Position + BufferContents + Copy + Clone>(
         tri_count += num_tris;
     }
 
-    println!("{:?}", tris);
-    println!("{:?}", mesh_data); 
     (tris, mesh_data)
 }

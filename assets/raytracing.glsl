@@ -3,6 +3,7 @@
 #define FLT_MIN 1.175494e-38
 #define M_PI 3.1415926535897932384626433832795
 #define UINT_MAX 4294967295
+#define INVIS_FLAG 1.0
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
@@ -50,7 +51,7 @@ vec3 RandomPointOnHemisphere(inout uint state, vec3 normal) {
 struct RayTracingMaterial {
     vec4 colour;
     vec4 emission; /// vec3 colour, float strength
-    vec4 settings; // roughness, metalic, fuzz
+    vec4 settings; // roughness, metalic, fuzz, flag
 };
 
 RayTracingMaterial empty_mat() {
@@ -315,18 +316,26 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
     for (int i = 0; i <= push_constants.max_bounces; i++) {
         RayHit hit = world_hit(ray_pos, ray_dir);
         if (hit.hit_dist < FLT_MAX) {
+            
+
             ray_pos = hit.hit_pos;
+            
+            if (hit.hit_mat.settings.w == INVIS_FLAG && i == 0) {
+                ray_pos = hit.hit_pos + ray_dir * 0.001;
+                continue;
+            }
             ray_dir = adjust_dir(ray_dir, hit.hit_normal, hit.hit_mat, state);
             
+
             vec3 emitted_light = vec3(hit.hit_mat.emission) * hit.hit_mat.emission.w;
             light += emitted_light * colour;
             colour *= vec3(hit.hit_mat.colour);
 
             // Random early exit if ray colour is nearly 0 (can't contribute much to final result)
-            float p = max(colour.x, max(colour.y, colour.z));
-            if (scaleToRange01(hash(state)) >= p) {
-                break;
-            }
+            // float p = max(colour.x, max(colour.y, colour.z));
+            // if (scaleToRange01(hash(state)) >= p) {
+            //     break;
+            // }
             // colour *= 1.0f / p; 
         }
         else {
