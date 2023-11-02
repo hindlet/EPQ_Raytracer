@@ -241,7 +241,7 @@ vec4 intersecting_tri(Triangle t, vec3 root_pos, vec3 dir) {
     float w = 1 - u - v;
     if (w < 0) {return vec4(FLT_MAX);}
 
-    return vec4(normal, dist);
+    return vec4(normalize(normal), dist);
 }
 
 RayHit intersecting_mesh(Mesh m, vec3 root_pos, vec3 dir) {

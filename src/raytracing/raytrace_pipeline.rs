@@ -16,7 +16,7 @@ mod raytrace_shader {
 /// Settings to be passed into the raytrace pipeline on creation
 #[derive(Clone, Debug)]
 pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clone> {
-    pub sample_settings: (f32, u32, u32, bool), // jitter_size, num_samples, max_bounces, use_environment_lighting
+    pub sample_settings: (u32, u32, bool), // jitter_size, num_samples, max_bounces, use_environment_lighting
     pub sphere_data: Vec<Sphere>,
     pub mesh_data: Vec<RayTracingMesh<T>>,
 
@@ -189,7 +189,7 @@ impl RayTracePipeine {
 
             ray_data: (ray_data, num_rays),
             sphere_data: sphere_data,
-            sample_data: (sample_size, settings.sample_settings.1, settings.sample_settings.2, settings.sample_settings.3),
+            sample_data: (sample_size, settings.sample_settings.0, settings.sample_settings.1, settings.sample_settings.2),
             mesh_data: mesh_data,
         }
     }
@@ -432,7 +432,7 @@ fn create_ray_subbuffer(
     }
 
     let num_rays = rays.len() as u32;
-    (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays, pixel_x.magnitude().max(pixel_y.magnitude()) * 0.5)
+    (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays, pixel_x.magnitude().max(pixel_y.magnitude()))
 }
 
 

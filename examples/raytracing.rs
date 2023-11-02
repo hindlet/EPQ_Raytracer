@@ -80,7 +80,7 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
         Sphere {
             centre: [-50.0, 30.0, 0.0],
             radius: 20.0,
-            material: LightMaterial {
+            material: InvisLightMaterial {
                 emission: [1.0, 1.0, 1.0, 15.0]
             }.to_mat()
         },
@@ -91,7 +91,7 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            sample_settings: (0.005, 2, 50, false),
+            sample_settings: (2, 50, false),
             sphere_data: spheres,
             mesh_data: Vec::new(),
             camera_focal_length: 1.0,
@@ -132,18 +132,16 @@ fn load_box_scene() -> RayTracingApp<PositionVertex>{
         },
         RayTracingMesh{ // ceiling
             mesh: meshes[2].clone(),
-            material: MetalMaterial{
-                colour: [1.0, 1.0, 1.0],
-                smoothness: 1.0,
-                fuzz: 0.5
+            material: LambertianMaterial {
+                colour: [1.0; 3]
             }.to_mat()
         },
-        RayTracingMesh{ // light
-            mesh: meshes[0].clone(),
-            material: LightMaterial {
-                emission: [1.0, 1.0, 1.0, 5.0]
-            }.to_mat()
-        }
+        // RayTracingMesh{ // light
+        //     mesh: meshes[0].clone(),
+        //     material: LightMaterial {
+        //         emission: [1.0, 1.0, 1.0, 15.0]
+        //     }.to_mat()
+        // }
     ];
 
     let sphere_data = vec![
@@ -160,7 +158,7 @@ fn load_box_scene() -> RayTracingApp<PositionVertex>{
         //     centre: [0.0, 2.5, 0.0],
         //     radius: 0.5,
         //     material: InvisLightMaterial {
-        //         emission: [1.0, 1.0, 1.0, 5.0]
+        //         emission: [1.0, 1.0, 1.0, 50.0]
         //     }.to_mat()
         // }
     ];
@@ -170,7 +168,7 @@ fn load_box_scene() -> RayTracingApp<PositionVertex>{
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            sample_settings: (0.005, 1, 50, false),
+            sample_settings: (1, 50, false),
             sphere_data: sphere_data,
             mesh_data: mesh_data,
             camera_focal_length: 1.0,
@@ -213,7 +211,7 @@ fn load_cube_scene() -> RayTracingApp<PositionVertex>{
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            sample_settings: (0.005, 10, 50, true),
+            sample_settings: (10, 50, true),
             sphere_data: sphere_data,
             mesh_data: mesh_data,
             camera_focal_length: 1.0,
