@@ -7,6 +7,8 @@ const NUM_RENDERS: u32 = 50;
 const TARGET_FPS: f32 = 30.0;
 const TARGET_FRAME_TIME: f32 = 1.0 / TARGET_FPS;
 
+
+/// CURRENT ISSUE, lambertian materials are not reflecting light sources correctly
 fn main() {
     let mut event_loop = EventLoop::new();
 
@@ -14,26 +16,13 @@ fn main() {
     let mut app = load_spheres_scene();
     // let mut app = load_box_scene();
     // let mut app = load_cube_scene();
-    app.camera.controllable();
+    // app.camera.controllable();
     
   
     app.open(&event_loop, IMAGE_SIZE);
     
 
-    // let mut start_time = Instant::now();
-    // let renderer = vulkano_windows.get_renderer_mut(scene_window_id).unwrap();
-    // let mut before_compute = renderer.acquire().unwrap();
-    // for i in 0..NUM_RENDERS {
-    //     before_compute = compute_pipeline.compute(before_compute, &camera, i);
-    //     image_combine_pipeline.add_image(compute_pipeline.image());
-    //     start_time = Instant::now();
-    // }
-    // let after_combine = image_combine_pipeline.combine(before_compute);
-    // let after_render = graphics_pipeline.render(after_combine, compute_pipeline.image(), renderer.swapchain_image_view());
-    // renderer.present(after_render, true);
-    // println!("It took {} seconds to render that image", start_time.elapsed().as_secs_f32());
-    
-    // compute_then_render(&mut app, 0.0);
+
 
     let mut last_frame_time = Instant::now();
     loop {
@@ -54,17 +43,17 @@ fn main() {
 fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
     let spheres = vec![
         Sphere {
-            centre: [0.0, -20.0, 0.0], 
-            radius: 20.0, 
+            centre: [0.0, -100.0, 0.0], 
+            radius: 100.0, 
             material: LambertianMaterial {
-                colour: [0.7, 0.1, 0.7].into(),
+                colour: [0.5, 0.5, 0.5].into(),
             }.to_mat()
         },
         Sphere {
             centre: [2.5, 0.75, 0.0], 
             radius: 1.0, 
             material: MetalMaterial {
-                colour: [1.0, 0.0, 0.0].into(),
+                colour: [0.2, 0.2, 1.0].into(),
                 smoothness: 1.0,
                 fuzz: 0.0
             }.to_mat()
@@ -73,7 +62,7 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
             centre: [-2.5, 0.75, 0.0], 
             radius: 1.0, 
             material: MetalMaterial {
-                colour: [0.0, 0.5, 0.5].into(),
+                colour: [1.0, 0.2, 0.2].into(),
                 smoothness: 1.0,
                 fuzz: 0.0,
             }.to_mat()
@@ -82,9 +71,17 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
             centre: [0.0, 1.0, 0.0], 
             radius: 1.0,
             material: MetalMaterial {
-                colour: [1.0, 0.4, 0.4].into(),
+                colour: [0.2, 1.0, 0.2].into(),
                 smoothness: 1.0,
                 fuzz: 0.0,
+            }.to_mat()
+        },
+
+        Sphere {
+            centre: [-50.0, 30.0, 0.0],
+            radius: 20.0,
+            material: LightMaterial {
+                emission: [1.0, 1.0, 1.0, 15.0]
             }.to_mat()
         },
     ];
@@ -94,7 +91,7 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            sample_settings: (0.005, 2, 25, true),
+            sample_settings: (0.005, 2, 50, false),
             sphere_data: spheres,
             mesh_data: Vec::new(),
             camera_focal_length: 1.0,
@@ -188,14 +185,14 @@ fn load_box_scene() -> RayTracingApp<PositionVertex>{
 fn load_cube_scene() -> RayTracingApp<PositionVertex>{
     let meshes = load_obj("assets/Cube.obj");
     let mesh_data = vec![
-        RayTracingMesh{
-            mesh: meshes[0].clone(),
-            material: MetalMaterial{
-                colour: [1.0, 0.0, 1.0],
-                smoothness: 1.0,
-                fuzz: 0.0
-            }.to_mat()
-        },
+        // RayTracingMesh{
+        //     mesh: meshes[0].clone(),
+        //     material: MetalMaterial{
+        //         colour: [0.7, 0.7, 0.7],
+        //         smoothness: 1.0,
+        //         fuzz: 0.0
+        //     }.to_mat()
+        // },
     ];
 
     let sphere_data = vec![
@@ -211,7 +208,7 @@ fn load_cube_scene() -> RayTracingApp<PositionVertex>{
     ];
 
 
-    let cam = Camera::new(Some([3.0, 1.5, 0.0]), Some([-1.0, 0.0, 0.0]), None, None);
+    let cam = Camera::new(Some([5.0, 2.0, 0.0]), Some([-1.0, -0.2, 0.0]), None, None);
     let up = cam.up;
     RayTracingApp::new(
         cam,

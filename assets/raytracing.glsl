@@ -26,7 +26,7 @@ float scaleToRange01(uint state) {
 
 // Random value in normal distribution (with mean=0 and sd=1)
 float RandomValueNormalDistribution(inout uint state) {
-    // Thanks to https://stackoverflow.com/a/6178290
+    // https://stackoverflow.com/a/6178290
     float theta = 2 * 3.1415926 * scaleToRange01(hash(state));
     float rho = sqrt(-2 * log(scaleToRange01(hash(state))));
     return rho * cos(theta);
@@ -80,8 +80,9 @@ struct Triangle {
     vec4 a; // first point
     vec4 edge_one; // edge one (b - a)
     vec4 edge_two; // edge two (c - a)
-    vec4 normal; // normal (edge_one x edge_two)
+    vec4 normal; // normal (edge_one x edge_two) - DO NOT NORMALISE, normalising scales down the triangles
 };
+
 
 struct Mesh {
     vec3 min_point;
@@ -91,12 +92,14 @@ struct Mesh {
     RayTracingMaterial material;
 };
 
+
 struct RayHit {
     vec3 hit_normal;
     vec3 hit_pos;
     float hit_dist;
     RayTracingMaterial hit_mat;
 };
+
 
 RayHit empty_hit() {
     return RayHit (
@@ -180,10 +183,11 @@ RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
     float discriminant = half_b * half_b - a * c;
 
     if (discriminant >= 0) {
+
         float dist = (-half_b - sqrt(discriminant)) / a;
         vec3 pos = ray_at(root_pos, dir, dist);
         return RayHit(
-            pos - s.centre,
+            normalize(pos - s.centre),
             pos,
             dist,
             s.material
@@ -294,7 +298,6 @@ vec3 environment_light(vec3 dir) {
 }
 
 
-/// there is a problem here, idk why
 vec3 adjust_dir(vec3 dir, vec3 normal, RayTracingMaterial mat, inout uint state) {
 
     vec3 diffuse_dir = normalize(normal + RandomPointOnUnitSphere(state) * mat.settings.x); // lambertian
@@ -331,12 +334,6 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
             light += emitted_light * colour;
             colour *= vec3(hit.hit_mat.colour);
 
-            // Random early exit if ray colour is nearly 0 (can't contribute much to final result)
-            // float p = max(colour.x, max(colour.y, colour.z));
-            // if (scaleToRange01(hash(state)) >= p) {
-            //     break;
-            // }
-            // colour *= 1.0f / p; 
         }
         else {
             light += environment_light(ray_dir);
@@ -346,7 +343,7 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
 
     // light = environment_light(ray_dir);
 
-    return light * colour_to_gamma_two(colour);
+    return light * colour;
 }
 
 

@@ -174,7 +174,7 @@ impl RayTracePipeine {
             ImageUsage::SAMPLED | ImageUsage::STORAGE | ImageUsage::TRANSFER_DST,
         ).unwrap();
 
-        let ray_data = create_ray_subbuffer(context, image_size, settings.camera_focal_length, settings.viewport_height, settings.up);
+        let (ray_data, num_rays, sample_size) = create_ray_subbuffer(context, image_size, settings.camera_focal_length, settings.viewport_height, settings.up);
         let sphere_data = create_sphere_subbuffer(context, settings.sphere_data);
         let mesh_data = create_mesh_subbuffer(context, &settings.mesh_data);
         
@@ -187,9 +187,9 @@ impl RayTracePipeine {
             image: image,
             image_size: image_size,
 
-            ray_data: ray_data,
+            ray_data: (ray_data, num_rays),
             sphere_data: sphere_data,
-            sample_data: settings.sample_settings,
+            sample_data: (sample_size, settings.sample_settings.1, settings.sample_settings.2, settings.sample_settings.3),
             mesh_data: mesh_data,
         }
     }
@@ -390,14 +390,14 @@ fn create_ray_subbuffer(
     camera_focal_length: f32,
     viewport_height: f32,
     up: impl Into<Vector3>,
-) -> (Subbuffer<[raytrace_shader::Ray]>, u32) {
+) -> (Subbuffer<[raytrace_shader::Ray]>, u32, f32) {
 
     // zero length protection
     if image_size[0] == 0 || image_size[1] == 0 {
         let null_ray = vec![raytrace_shader::Ray {
             sample_centre: [0.0, 0.0, 0.0, 0.0],
         }];
-        return (create_shader_data_buffer(null_ray, context, BufferType::Storage), 0);
+        return (create_shader_data_buffer(null_ray, context, BufferType::Storage), 0, 0.0);
     }
 
 
@@ -408,8 +408,8 @@ fn create_ray_subbuffer(
     let viewport_y = viewport_x.cross(Vector3::X).normalised();
     let viewport_upper_left = Vector3::ZERO + Vector3::X * camera_focal_length - (viewport_x * viewport_width + viewport_y * viewport_height) * 0.5;
 
-    let pixel_x = viewport_x * viewport_width / image_size[0] as f32;
-    let pixel_y = viewport_y * viewport_height / image_size[1] as f32;
+    let pixel_x: Vector3 = viewport_x * viewport_width / image_size[0] as f32;
+    let pixel_y: Vector3 = viewport_y * viewport_height / image_size[1] as f32;
 
     let first_ray = viewport_upper_left + (pixel_x + pixel_y) * 0.5;
     let mut ray_centres: Vec<[f32; 4]> = Vec::new();
@@ -432,7 +432,7 @@ fn create_ray_subbuffer(
     }
 
     let num_rays = rays.len() as u32;
-    (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays)
+    (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays, pixel_x.magnitude().max(pixel_y.magnitude()) * 0.5)
 }
 
 
