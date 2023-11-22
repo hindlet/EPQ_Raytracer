@@ -11,12 +11,14 @@ mod raytrace_shader {
     }
 }
 
-
-
 /// Settings to be passed into the raytrace pipeline on creation
 #[derive(Clone, Debug)]
 pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clone> {
-    pub sample_settings: (u32, u32, bool), // jitter_size, num_samples, max_bounces, use_environment_lighting
+    pub sample_jitter: Option<f32>,
+    pub num_samples: u32,
+    pub max_bounces: u32,
+    pub use_environment_lighting: bool,
+    
     pub sphere_data: Vec<Sphere>,
     pub mesh_data: Vec<RayTracingMesh<T>>,
 
@@ -25,16 +27,47 @@ pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clo
     pub up: [f32; 3],
 }
 
-pub trait RayTraceMaterial {
-    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial;
+
+pub struct CustomMaterial {
+    pub colour: [f32; 3],
+    pub emission_colour: [f32; 3],
+    pub emission_strength: f32,
+    pub smoothness: f32,
+    pub fuzz: f32,
+    pub specular_probability: f32,
 }
+
+impl Into<raytrace_shader::RayTracingMaterial> for CustomMaterial {
+    fn into(self) -> raytrace_shader::RayTracingMaterial {
+        raytrace_shader::RayTracingMaterial {
+            colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
+            emission: [self.emission_colour[0], self.emission_colour[1], self.emission_colour[2], self.emission_strength],
+            settings: [self.specular_probability, self.smoothness, self.fuzz, 0.0]
+        }
+    }
+}
+
+impl Default for CustomMaterial {
+    fn default() -> Self {
+        CustomMaterial {
+            colour: [0.5; 3],
+            emission_colour: [0.0; 3],
+            emission_strength: 0.0,
+            smoothness: 0.0,
+            fuzz: 0.0,
+            specular_probability: 0.0,
+        }
+    }
+}
+
+
 
 pub struct LambertianMaterial {
     pub colour: [f32; 3],
 }
 
-impl RayTraceMaterial for LambertianMaterial {
-    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
+impl Into<raytrace_shader::RayTracingMaterial> for LambertianMaterial {
+    fn into(self) -> raytrace_shader::RayTracingMaterial {
         raytrace_shader::RayTracingMaterial {
             colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
             emission: [0.0; 4],
@@ -49,12 +82,12 @@ pub struct MetalMaterial {
     pub fuzz: f32
 }
 
-impl RayTraceMaterial for MetalMaterial {
-    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
+impl Into<raytrace_shader::RayTracingMaterial> for MetalMaterial {
+    fn into(self) -> raytrace_shader::RayTracingMaterial {
         raytrace_shader::RayTracingMaterial {
             colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
             emission: [0.0; 4],
-            settings: [0.0, self.smoothness, self.fuzz, 0.0]
+            settings: [1.0, self.smoothness, self.fuzz, 0.0]
         }
     }
 }
@@ -63,12 +96,12 @@ pub struct LightMaterial {
     pub emission: [f32; 4]
 }
 
-impl RayTraceMaterial for LightMaterial {
-    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
+impl Into<raytrace_shader::RayTracingMaterial> for LightMaterial {
+    fn into(self) -> raytrace_shader::RayTracingMaterial {
         raytrace_shader::RayTracingMaterial {
             colour: [1.0; 4],
             emission: self.emission,
-            settings: [0.0, 1.0, 0.0, 0.0]
+            settings: [1.0, 1.0, 0.0, 0.0]
         }
     }
 }
@@ -77,8 +110,8 @@ pub struct InvisLightMaterial {
     pub emission: [f32; 4]
 }
 
-impl RayTraceMaterial for InvisLightMaterial {
-    fn to_mat(&self) -> raytrace_shader::RayTracingMaterial {
+impl Into<raytrace_shader::RayTracingMaterial> for InvisLightMaterial {
+    fn into(self) -> raytrace_shader::RayTracingMaterial {
         raytrace_shader::RayTracingMaterial {
             colour: [1.0; 4],
             emission: self.emission,
@@ -110,7 +143,7 @@ fn get_null_sphere() -> Sphere {
     Sphere {
         centre: [0.0; 3],
         radius: 0.0,
-        material: LambertianMaterial{colour: [1.0; 3]}.to_mat()
+        material: LambertianMaterial{colour: [1.0; 3]}.into()
     }
 }
 
@@ -127,7 +160,7 @@ fn get_null_mesh() -> RayTracingMesh<PositionVertex> {
     mesh.set_normals(vec![Normal{normal: [1.0; 3]}]);
     RayTracingMesh {
         mesh: mesh,
-        material: LambertianMaterial{colour: [1.0; 3]}.to_mat()
+        material: LambertianMaterial{colour: [1.0; 3]}.into()
     }
 }
 
@@ -143,7 +176,10 @@ pub struct RayTracePipeine {
 
     ray_data: (Subbuffer<[raytrace_shader::Ray]>, u32),
     sphere_data: (Subbuffer<[raytrace_shader::Sphere]>, u32),
-    sample_data: (f32, u32, u32, bool), // jitter_size, num_samples, max_bounces, use_environment_lighting
+    sample_jitter: f32,
+    num_samples: u32,
+    max_bounces: u32,
+    use_environment_lighting: bool,
     mesh_data: (Subbuffer<[raytrace_shader::Triangle]>, Subbuffer<[raytrace_shader::Mesh]>, u32)
 }
 
@@ -174,7 +210,7 @@ impl RayTracePipeine {
             ImageUsage::SAMPLED | ImageUsage::STORAGE | ImageUsage::TRANSFER_DST,
         ).unwrap();
 
-        let (ray_data, num_rays, sample_size) = create_ray_subbuffer(context, image_size, settings.camera_focal_length, settings.viewport_height, settings.up);
+        let (ray_data, num_rays, jitter) = create_ray_subbuffer(context, image_size, settings.camera_focal_length, settings.viewport_height, settings.up);
         let sphere_data = create_sphere_subbuffer(context, settings.sphere_data);
         let mesh_data = create_mesh_subbuffer(context, &settings.mesh_data);
         
@@ -187,9 +223,13 @@ impl RayTracePipeine {
             image: image,
             image_size: image_size,
 
+            num_samples: settings.num_samples.max(1),
+            max_bounces: settings.max_bounces.max(0),
+            use_environment_lighting: settings.use_environment_lighting,
+            sample_jitter: settings.sample_jitter.unwrap_or(jitter),
+
             ray_data: (ray_data, num_rays),
             sphere_data: sphere_data,
-            sample_data: (sample_size, settings.sample_settings.0, settings.sample_settings.1, settings.sample_settings.2),
             mesh_data: mesh_data,
         }
     }
@@ -344,10 +384,10 @@ impl RayTracePipeine {
             num_rays: self.ray_data.1 as i32,
             num_spheres: self.sphere_data.1 as i32,
             num_meshes: self.mesh_data.2 as i32,
-            num_samples: self.sample_data.1 as i32,
-            jitter_size: self.sample_data.0,
-            max_bounces: self.sample_data.2 as i32,
-            use_environment_light: self.sample_data.3 as u32,
+            num_samples: self.num_samples as i32,
+            jitter_size: self.sample_jitter,
+            max_bounces: self.max_bounces as i32,
+            use_environment_light: self.use_environment_lighting as u32,
             rng_offset: rng_offset,
             init: init as u32,
             width: self.image_size[0],
@@ -432,7 +472,7 @@ fn create_ray_subbuffer(
     }
 
     let num_rays = rays.len() as u32;
-    (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays, pixel_x.magnitude().max(pixel_y.magnitude()))
+    (create_shader_data_buffer(rays, context, BufferType::Storage), num_rays, pixel_x.magnitude().max(pixel_y.magnitude()) * 0.5)
 }
 
 

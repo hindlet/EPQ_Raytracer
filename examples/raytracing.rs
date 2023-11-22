@@ -3,7 +3,6 @@ use graphics::*;
 use lighting_models::raytracing::*;
 
 const IMAGE_SIZE: [u32; 2] = [1080, 720];
-const NUM_RENDERS: u32 = 50;
 const TARGET_FPS: f32 = 30.0;
 const TARGET_FRAME_TIME: f32 = 1.0 / TARGET_FPS;
 
@@ -13,8 +12,8 @@ fn main() {
     let mut event_loop = EventLoop::new();
 
 
-    let mut app = load_spheres_scene();
-    // let mut app = load_box_scene();
+    // let mut app = load_spheres_scene();
+    let mut app = load_box_scene();
     // let mut app = load_cube_scene();
     // app.camera.controllable();
     
@@ -47,7 +46,7 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
             radius: 100.0, 
             material: LambertianMaterial {
                 colour: [0.5, 0.5, 0.5].into(),
-            }.to_mat()
+            }.into()
         },
         Sphere {
             centre: [2.5, 0.75, 0.0], 
@@ -55,8 +54,8 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
             material: MetalMaterial {
                 colour: [0.2, 0.2, 1.0].into(),
                 smoothness: 1.0,
-                fuzz: 0.0
-            }.to_mat()
+                fuzz: 0.1
+            }.into()
         },
         Sphere {
             centre: [-2.5, 0.75, 0.0], 
@@ -64,8 +63,8 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
             material: MetalMaterial {
                 colour: [1.0, 0.2, 0.2].into(),
                 smoothness: 1.0,
-                fuzz: 0.0,
-            }.to_mat()
+                fuzz: 0.1,
+            }.into()
         },
         Sphere {
             centre: [0.0, 1.0, 0.0], 
@@ -73,17 +72,17 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
             material: MetalMaterial {
                 colour: [0.2, 1.0, 0.2].into(),
                 smoothness: 1.0,
-                fuzz: 0.0,
-            }.to_mat()
+                fuzz: 0.1,
+            }.into()
         },
 
-        Sphere {
-            centre: [-50.0, 30.0, 0.0],
-            radius: 20.0,
-            material: InvisLightMaterial {
-                emission: [1.0, 1.0, 1.0, 15.0]
-            }.to_mat()
-        },
+        // Sphere {
+        //     centre: [500.0, 100.0, 500.0],
+        //     radius: 250.0,
+        //     material: LightMaterial {
+        //         emission: [1.0, 1.0, 1.0, 25.0]
+        //     }.to_mat()
+        // },
     ];
 
     let cam = Camera::new(Some([2.0, 2.0, -5.0]), Some([-0.35, -0.35, 0.87]), Some(10.0), None);
@@ -91,7 +90,10 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            sample_settings: (2, 50, false),
+            num_samples: 5,
+            max_bounces: 50,
+            use_environment_lighting: false,
+            sample_jitter: None,
             sphere_data: spheres,
             mesh_data: Vec::new(),
             camera_focal_length: 1.0,
@@ -107,68 +109,97 @@ fn load_box_scene() -> RayTracingApp<PositionVertex>{
     let meshes = load_obj("assets/box.obj");
     let mesh_data = vec![
         RayTracingMesh{ // floor
-            mesh: meshes[1].clone(),
-            material: LambertianMaterial{
+            mesh: meshes[0].clone(),
+            material: CustomMaterial {
                 colour: [1.0, 1.0, 1.0],
-            }.to_mat()
+                smoothness: 0.7,
+                specular_probability: 0.5,
+                ..Default::default()
+            }.into()
         },
-        RayTracingMesh{ // wall
-            mesh: meshes[3].clone(),
-            material: LambertianMaterial{
-                colour: [166.0 / 255.0, 45.0 / 255.0, 23.0 / 255.0],
-            }.to_mat()
-        },
-        RayTracingMesh{ // wall
+        RayTracingMesh{ // Left Wall
             mesh: meshes[4].clone(),
-            material: LambertianMaterial{
-                colour: [19.0 / 255.0, 133.0 / 255.0, 34.0 / 255.0],
-            }.to_mat()
+            material: CustomMaterial {
+                colour: [166.0 / 255.0, 45.0 / 255.0, 23.0 / 255.0],
+                smoothness: 0.7,
+                specular_probability: 0.5,
+                ..Default::default()
+            }.into()
         },
-        RayTracingMesh{ // wall
-            mesh: meshes[5].clone(),
-            material: LambertianMaterial{
-                colour: [28.0 / 255.0, 83.0 / 255.0, 112.0 / 255.0],
-            }.to_mat()
+        RayTracingMesh{ // Right Wall
+            mesh: meshes[3].clone(),
+            material: CustomMaterial {
+                colour: [19.0 / 255.0, 133.0 / 255.0, 34.0 / 255.0],
+                smoothness: 0.7,
+                specular_probability: 0.5,
+                ..Default::default()
+            }.into()
+        },
+        RayTracingMesh{ // Back Wall
+            mesh: meshes[1].clone(),
+            material: CustomMaterial {
+                colour: [1.0; 3],
+                smoothness: 0.7,
+                specular_probability: 0.5,
+                ..Default::default()
+            }.into()
         },
         RayTracingMesh{ // ceiling
-            mesh: meshes[2].clone(),
-            material: LambertianMaterial {
-                colour: [1.0; 3]
-            }.to_mat()
+            mesh: meshes[5].clone(),
+            material: CustomMaterial {
+                colour: [1.0; 3],
+                smoothness: 0.7,
+                specular_probability: 0.5,
+                ..Default::default()
+            }.into()
         },
-        // RayTracingMesh{ // light
-        //     mesh: meshes[0].clone(),
-        //     material: LightMaterial {
-        //         emission: [1.0, 1.0, 1.0, 15.0]
-        //     }.to_mat()
-        // }
+        RayTracingMesh{ // Front Wall
+            mesh: meshes[2].clone(),
+            material: CustomMaterial {
+                colour: [1.0; 3],
+                smoothness: 0.7,
+                specular_probability: 0.5,
+                ..Default::default()
+            }.into()
+        },
+        RayTracingMesh{ // light
+            mesh: meshes[6].clone(),
+            material: LightMaterial {
+                emission: [1.0, 1.0, 1.0, 5.0]
+            }.into()
+        }
     ];
 
     let sphere_data = vec![
-        // Sphere{
-        //     centre: [0.0, 1.0, 0.0].into(),
-        //     radius: 1.0,
-        //     material: MetalMaterial {
-        //         smoothness: 1.0,
-        //         fuzz: 0.0,
-        //         colour: [1.0, 1.0, 1.0].into(),
-        //     }.to_mat()
-        // },
-        // Sphere {
-        //     centre: [0.0, 2.5, 0.0],
-        //     radius: 0.5,
-        //     material: InvisLightMaterial {
-        //         emission: [1.0, 1.0, 1.0, 50.0]
-        //     }.to_mat()
-        // }
+        Sphere{
+            centre: [-0.5, 0.5, 0.0].into(),
+            radius: 0.5,
+            material: MetalMaterial {
+                smoothness: 1.0,
+                fuzz: 0.0,
+                colour: [1.0, 1.0, 1.0].into(),
+            }.into()
+        },
+        Sphere{
+            centre: [0.5, 0.5, 0.0].into(),
+            radius: 0.5,
+            material: MetalMaterial {
+                smoothness: 1.0,
+                fuzz: 0.0,
+                colour: [1.0, 1.0, 1.0].into(),
+            }.into()
+        },
     ];
 
-    let cam = Camera::new(Some([8.0, 1.5, 0.0]), Some([-1.0, 0.0, 0.0]), None, None);
+    let cam = Camera::new(Some([1.5, 1.0, 0.0]), Some([-1.0, 0.0, 0.0]), None, None);
     let up = cam.up;
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            sample_settings: (1, 50, false),
+            num_samples: 5,
+            max_bounces: 50,
+            use_environment_lighting: false,
+            sample_jitter: Some(0.001),
             sphere_data: sphere_data,
             mesh_data: mesh_data,
             camera_focal_length: 1.0,
@@ -183,14 +214,14 @@ fn load_box_scene() -> RayTracingApp<PositionVertex>{
 fn load_cube_scene() -> RayTracingApp<PositionVertex>{
     let meshes = load_obj("assets/Cube.obj");
     let mesh_data = vec![
-        // RayTracingMesh{
-        //     mesh: meshes[0].clone(),
-        //     material: MetalMaterial{
-        //         colour: [0.7, 0.7, 0.7],
-        //         smoothness: 1.0,
-        //         fuzz: 0.0
-        //     }.to_mat()
-        // },
+        RayTracingMesh{
+            mesh: meshes[0].clone(),
+            material: MetalMaterial{
+                colour: [0.7, 0.7, 0.7],
+                smoothness: 1.0,
+                fuzz: 0.0
+            }.into()
+        },
     ];
 
     let sphere_data = vec![
@@ -201,7 +232,7 @@ fn load_cube_scene() -> RayTracingApp<PositionVertex>{
                 smoothness: 1.0,
                 fuzz: 0.0,
                 colour: [1.0, 1.0, 1.0].into(),
-            }.to_mat()
+            }.into()
         },
     ];
 
@@ -211,7 +242,10 @@ fn load_cube_scene() -> RayTracingApp<PositionVertex>{
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            sample_settings: (10, 50, true),
+            num_samples: 10,
+            max_bounces: 50,
+            use_environment_lighting: true,
+            sample_jitter: None,
             sphere_data: sphere_data,
             mesh_data: mesh_data,
             camera_focal_length: 1.0,

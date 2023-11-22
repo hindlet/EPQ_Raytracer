@@ -2,7 +2,7 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494e-38
 #define M_PI 3.1415926535897932384626433832795
-#define UINT_MAX 4294967295
+#define UINT_MAX 4294967295.0
 #define INVIS_FLAG 1.0
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
@@ -21,7 +21,7 @@ uint hash(inout uint state) {
 }
 
 float scaleToRange01(uint state) {
-    return state / 4294967295.0;
+    return state / UINT_MAX;
 }
 
 // Random value in normal distribution (with mean=0 and sd=1)
@@ -51,7 +51,7 @@ vec3 RandomPointOnHemisphere(inout uint state, vec3 normal) {
 struct RayTracingMaterial {
     vec4 colour;
     vec4 emission; /// vec3 colour, float strength
-    vec4 settings; // roughness, metalic, fuzz, flag
+    vec4 settings; // specular probability, metalic, fuzz, flag
 };
 
 RayTracingMaterial empty_mat() {
@@ -165,14 +165,6 @@ vec3 get_ray_dir(vec3 sample_centre, inout uint state) {
     return normalize(mat3(push_constants.cam_alignment_mat) * new_centre);
 }
 
-vec3 colour_to_gamma_two(vec3 colour) {
-    return vec3(sqrt(colour.x), sqrt(colour.y), sqrt(colour.z));
-}
-
-vec3 lerp(vec3 a, vec3 b, float x) {
-    return (a + b) * x;
-}
-
 
 RayHit intersecting_sphere(Sphere s, vec3 root_pos, vec3 dir) {
     vec3 l = root_pos - s.centre;
@@ -221,6 +213,10 @@ bool intersecting_aabb(vec3 min_point, vec3 max_point, vec3 root_pos, vec3 dir) 
 vec4 intersecting_tri(Triangle t, vec3 root_pos, vec3 dir) {
 
     vec3 normal = vec3(t.normal);
+
+    if (dot(dir, normal) >= 0) {
+        return vec4(0, 0, 0, FLT_MAX);
+    }
 
     vec3 ao = root_pos - vec3(t.a);
     vec3 dao = cross(ao, dir);
@@ -298,13 +294,13 @@ vec3 environment_light(vec3 dir) {
 }
 
 
-vec3 adjust_dir(vec3 dir, vec3 normal, RayTracingMaterial mat, inout uint state) {
+vec3 adjust_dir(vec3 dir, vec3 normal, RayTracingMaterial mat, bool specular, inout uint state) {
 
-    vec3 diffuse_dir = normalize(normal + RandomPointOnUnitSphere(state) * mat.settings.x); // lambertian
+    vec3 diffuse_dir = normalize(normal + RandomPointOnUnitSphere(state)); // lambertian
     vec3 specular_dir = reflect(dir, normal); // metal
     vec3 fuzz = RandomPointOnUnitSphere(state) * mat.settings.z; // metal fuzz
     
-    vec3 new_dir = normalize(mix(diffuse_dir, specular_dir, mat.settings.y) + fuzz);
+    vec3 new_dir = normalize(mix(diffuse_dir, specular_dir, mat.settings.y * int(specular)) + fuzz);
     return new_dir;
 }
 
@@ -327,13 +323,21 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
                 ray_pos = hit.hit_pos + ray_dir * 0.001;
                 continue;
             }
-            ray_dir = adjust_dir(ray_dir, hit.hit_normal, hit.hit_mat, state);
+            
+
+            bool is_specular = scaleToRange01(hash(state)) < hit.hit_mat.settings.x;
+            ray_dir = adjust_dir(ray_dir, hit.hit_normal, hit.hit_mat, is_specular, state);
             
 
             vec3 emitted_light = vec3(hit.hit_mat.emission) * hit.hit_mat.emission.w;
             light += emitted_light * colour;
             colour *= vec3(hit.hit_mat.colour);
 
+            float p = max(colour.x, max(colour.y, colour.z));
+            if (scaleToRange01(hash(state)) >= p) {
+                break;
+            }
+            colour /= p;
         }
         else {
             light += environment_light(ray_dir);
