@@ -164,3 +164,36 @@ pub fn compute_then_render<T: graphics::Position + BufferContents + Copy + Clone
     window_renderer.present(after_render, true);
     app.frame += 1;
 }
+
+pub fn compute_n_then_render<T: graphics::Position + BufferContents + Copy + Clone>(
+    app: &mut RayTracingApp<T>,
+    num_renders: usize
+) {
+    let window_renderer = app.windows.get_primary_renderer_mut().unwrap();
+    let (raytrace_pipeline, diffuse_pipeline, render_pipeline) = app.pipeline.as_mut().unwrap();
+
+
+    let mut last_future = match window_renderer.acquire() {
+        Err(e) => {
+            println!("{e}");
+            return;
+        }
+        Ok(future) => future,
+    };
+    for _ in 0..num_renders {
+        let after_raytrace = raytrace_pipeline.compute(last_future, &app.camera, app.frame);
+        let raytrace_image = raytrace_pipeline.image();
+
+        last_future = diffuse_pipeline.next_frame(app.frame, raytrace_image, after_raytrace);
+        app.frame += 1;
+    }
+
+    let diffuse_image = diffuse_pipeline.image();
+
+    let target_image = window_renderer.swapchain_image_view();
+
+    let after_render = render_pipeline
+        .render(last_future, diffuse_image, target_image);
+
+    window_renderer.present(after_render, true);
+}

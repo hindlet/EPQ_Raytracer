@@ -3,17 +3,17 @@ use graphics::*;
 use lighting_models::raytracing::*;
 
 const IMAGE_SIZE: [u32; 2] = [1080, 720];
-const TARGET_FPS: f32 = 30.0;
+const TARGET_FPS: f32 = 60.0;
 const TARGET_FRAME_TIME: f32 = 1.0 / TARGET_FPS;
+const NUM_RENDERS: usize = 50;
+const REALTIME: bool = true;
 
-
-/// CURRENT ISSUE, lambertian materials are not reflecting light sources correctly
 fn main() {
     let mut event_loop = EventLoop::new();
 
 
-    // let mut app = load_spheres_scene();
-    let mut app = load_box_scene();
+    let mut app = load_spheres_scene();
+    // let mut app = load_box_scene();
     // let mut app = load_cube_scene();
     // app.camera.controllable();
     
@@ -22,17 +22,22 @@ fn main() {
     
 
 
+    if !REALTIME {
+        compute_n_then_render(&mut app, NUM_RENDERS);
+    }
 
     let mut last_frame_time = Instant::now();
     loop {
         if !handle_events(&mut app, &mut event_loop) {break;}
 
+        if !REALTIME{continue;}
         let frame_time = last_frame_time.elapsed().as_secs_f32();
         if frame_time >= TARGET_FRAME_TIME {
             last_frame_time = Instant::now();
             
             compute_then_render(&mut app, frame_time);
             // println!("{:?}, {:?}", camera.position, camera.direction);
+            // if last_frame_time.elapsed().as_secs_f32() > TARGET_FRAME_TIME {println!("Slow frame")}
         }
     }
 
@@ -76,21 +81,23 @@ fn load_spheres_scene() -> RayTracingApp<PositionVertex>{
             }.into()
         },
 
-        // Sphere {
-        //     centre: [500.0, 100.0, 500.0],
-        //     radius: 250.0,
-        //     material: LightMaterial {
-        //         emission: [1.0, 1.0, 1.0, 25.0]
-        //     }.to_mat()
-        // },
+        Sphere {
+            centre: [500.0, 100.0, 500.0],
+            radius: 250.0,
+            material: InvisLightMaterial {
+                emission: [0.6, 0.6, 1.0, 25.0]
+            }.into()
+        },
     ];
 
-    let cam = Camera::new(Some([2.0, 2.0, -5.0]), Some([-0.35, -0.35, 0.87]), Some(10.0), None);
+    let view_dir = [-0.35, -0.35, 0.87];
+    // println!("{:?}", maths::Vector3::direction_to_euler_angles(view_dir));
+    let cam = Camera::new(Some([2.0, 2.0, -5.0]), Some(view_dir), Some(10.0), None);
     let up = cam.up;
     RayTracingApp::new(
         cam,
         RayTracerSettings {
-            num_samples: 5,
+            num_samples: 25,
             max_bounces: 50,
             use_environment_lighting: false,
             sample_jitter: None,

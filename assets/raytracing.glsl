@@ -308,6 +308,7 @@ vec3 adjust_dir(vec3 dir, vec3 normal, RayTracingMaterial mat, bool specular, in
 vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
     vec3 light = vec3(0);
     vec3 colour = vec3(1);
+    bool has_not_hit_visible_object = true;
 
     vec3 ray_pos = root_pos;
     vec3 ray_dir = dir;
@@ -317,12 +318,12 @@ vec3 trace_ray(vec3 root_pos, vec3 dir, inout uint state) {
         if (hit.hit_dist < FLT_MAX) {
             
 
-            ray_pos = hit.hit_pos;
+            ray_pos = hit.hit_pos + float(hit.hit_mat.settings.w == INVIS_FLAG) * 0.001;
             
-            if (hit.hit_mat.settings.w == INVIS_FLAG && i == 0) {
+            if (hit.hit_mat.settings.w == INVIS_FLAG && has_not_hit_visible_object) {
                 ray_pos = hit.hit_pos + ray_dir * 0.001;
                 continue;
-            }
+            } else {has_not_hit_visible_object = false;}
             
 
             bool is_specular = scaleToRange01(hash(state)) < hit.hit_mat.settings.x;
