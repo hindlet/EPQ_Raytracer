@@ -1,11 +1,16 @@
 use std::time::Instant;
 use graphics::*;
-use lighting_models::raytracing::*;
+mod diffuse;
+mod raytrace_pipeline;
+mod raytracing_app;
+mod texture_draw_pipeline;
+use raytracing_app::*;
+use raytrace_pipeline::*;
 
 const IMAGE_SIZE: [u32; 2] = [1080, 720];
 const TARGET_FPS: f32 = 60.0;
 const TARGET_FRAME_TIME: f32 = 1.0 / TARGET_FPS;
-const NUM_RENDERS: usize = 500; // set to 0 for infinite renders
+const NUM_RENDERS: usize = 5000; // set to 0 for infinite renders
 const REALTIME: bool = true;
 
 fn main() {
