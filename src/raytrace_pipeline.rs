@@ -180,7 +180,7 @@ fn get_null_mesh() -> RayTracingMesh<PositionVertex> {
 
 
 /// The raytracing pipeline
-pub struct RayTracePipeine {
+pub struct RayTracePipeline {
     compute_queue: Arc<Queue>,
     compute_pipeline: Arc<ComputePipeline>,
     command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
@@ -198,7 +198,7 @@ pub struct RayTracePipeine {
 }
 
 
-impl RayTracePipeine {
+impl RayTracePipeline {
     /// creates a new raytrace pipeline with the given settings
     pub fn new<T: graphics::Position + BufferContents + Copy + Clone>(
         context: &VulkanoContext,
@@ -212,7 +212,7 @@ impl RayTracePipeine {
             context.device().clone(),
             raytrace_shader::load(context.device().clone()).unwrap().entry_point("main").unwrap(),
             &(),
-            RayTracePipeine::get_pipeline_layout(context),
+            RayTracePipeline::get_pipeline_layout(context),
             None,
         ).unwrap();
         
@@ -229,7 +229,7 @@ impl RayTracePipeine {
         let mesh_data = create_mesh_subbuffer(context, &settings.mesh_data);
         
 
-        RayTracePipeine {
+        RayTracePipeline {
             compute_queue: context.graphics_queue().clone(),
             compute_pipeline: pipeline,
             command_buffer_allocator: command_buffer_allocator.clone(),

@@ -7,7 +7,7 @@ use graphics::all_vulkano::{
 use graphics::all_vulkano_utils::{window::{VulkanoWindows, WindowDescriptor}, context::VulkanoConfig};
 use super::{
     diffuse::DiffusePipeline,
-    raytrace_pipeline::{RayTracePipeine, RayTracerSettings},
+    raytrace_pipeline::{RayTracePipeline, RayTracerSettings},
     texture_draw_pipeline::RenderPassOverFrame,
 };
 
@@ -17,7 +17,7 @@ pub struct RayTracingApp<T: graphics::Position + BufferContents + Copy + Clone> 
     pub windows: VulkanoWindows,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
-    pub pipeline: Option<(RayTracePipeine, DiffusePipeline, RenderPassOverFrame)>,
+    pub pipeline: Option<(RayTracePipeline, DiffusePipeline, RenderPassOverFrame)>,
     frame: u32,
     pub camera: Camera,
     settings: RayTracerSettings<T>
@@ -71,7 +71,7 @@ impl<T: graphics::Position + BufferContents + Copy + Clone> RayTracingApp<T> {
             |_| {}
         );
 
-        let raytrace_pipeline = RayTracePipeine::new(
+        let raytrace_pipeline = RayTracePipeline::new(
             &self.context,
             &self.command_buffer_allocator,
             &self.descriptor_set_allocator,
