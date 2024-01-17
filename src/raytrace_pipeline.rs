@@ -1,5 +1,4 @@
 use maths::{Vector3, Matrix3, Vector4};
-use std::fmt::Debug;
 use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::mem::size_of;
@@ -15,166 +14,15 @@ use graphics::all_vulkano::{
     buffer::BufferContents,
     shader::ShaderStages,
 };
+use super::raytracing_app::RayTracerSettings;
+use super::objects::*;
 
 
-mod raytrace_shader {
+pub mod raytrace_shader {
     graphics::shader!{
         ty: "compute",
         path: "assets/raytracing.glsl",
         custom_derives: [Debug, Clone]
-    }
-}
-
-/// Settings to be passed into the raytrace pipeline on creation
-#[derive(Clone, Debug)]
-pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clone> {
-    pub sample_jitter: Option<f32>,
-    pub num_samples: u32,
-    pub max_bounces: u32,
-    pub use_environment_lighting: bool,
-    
-    pub sphere_data: Vec<Sphere>,
-    pub mesh_data: Vec<RayTracingMesh<T>>,
-
-    pub camera_focal_length: f32,
-    pub viewport_height: f32,
-    pub up: [f32; 3],
-}
-
-
-pub struct CustomMaterial {
-    pub colour: [f32; 3],
-    pub emission_colour: [f32; 3],
-    pub emission_strength: f32,
-    pub smoothness: f32,
-    pub fuzz: f32,
-    pub specular_probability: f32,
-}
-
-impl Into<raytrace_shader::RayTracingMaterial> for CustomMaterial {
-    fn into(self) -> raytrace_shader::RayTracingMaterial {
-        raytrace_shader::RayTracingMaterial {
-            colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
-            emission: [self.emission_colour[0], self.emission_colour[1], self.emission_colour[2], self.emission_strength],
-            settings: [self.specular_probability, self.smoothness, self.fuzz, 0.0]
-        }
-    }
-}
-
-impl Default for CustomMaterial {
-    fn default() -> Self {
-        CustomMaterial {
-            colour: [0.5; 3],
-            emission_colour: [0.0; 3],
-            emission_strength: 0.0,
-            smoothness: 0.0,
-            fuzz: 0.0,
-            specular_probability: 0.0,
-        }
-    }
-}
-
-
-
-pub struct LambertianMaterial {
-    pub colour: [f32; 3],
-}
-
-impl Into<raytrace_shader::RayTracingMaterial> for LambertianMaterial {
-    fn into(self) -> raytrace_shader::RayTracingMaterial {
-        raytrace_shader::RayTracingMaterial {
-            colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
-            emission: [0.0; 4],
-            settings: [1.0, 0.0, 0.0, 0.0]
-        }
-    }
-}
-
-pub struct MetalMaterial {
-    pub colour: [f32; 3],
-    pub smoothness: f32,
-    pub fuzz: f32
-}
-
-impl Into<raytrace_shader::RayTracingMaterial> for MetalMaterial {
-    fn into(self) -> raytrace_shader::RayTracingMaterial {
-        raytrace_shader::RayTracingMaterial {
-            colour: [self.colour[0], self.colour[1], self.colour[2], 0.0],
-            emission: [0.0; 4],
-            settings: [1.0, self.smoothness, self.fuzz, 0.0]
-        }
-    }
-}
-
-pub struct LightMaterial {
-    pub emission: [f32; 4]
-}
-
-impl Into<raytrace_shader::RayTracingMaterial> for LightMaterial {
-    fn into(self) -> raytrace_shader::RayTracingMaterial {
-        raytrace_shader::RayTracingMaterial {
-            colour: [1.0; 4],
-            emission: self.emission,
-            settings: [1.0, 1.0, 0.0, 0.0]
-        }
-    }
-}
-
-pub struct InvisLightMaterial {
-    pub emission: [f32; 4]
-}
-
-impl Into<raytrace_shader::RayTracingMaterial> for InvisLightMaterial {
-    fn into(self) -> raytrace_shader::RayTracingMaterial {
-        raytrace_shader::RayTracingMaterial {
-            colour: [1.0; 4],
-            emission: self.emission,
-            settings: [0.0, 1.0, 0.0, 1.0]
-        }
-    }
-}
-
-
-/// Sphere representation
-#[derive(Debug, Clone)]
-pub struct Sphere {
-    pub centre: [f32; 3],
-    pub radius: f32,
-    pub material: raytrace_shader::RayTracingMaterial
-}
-
-impl Into<raytrace_shader::Sphere> for Sphere {
-    fn into(self) -> raytrace_shader::Sphere {
-        raytrace_shader::Sphere {
-            centre: self.centre,
-            radius: self.radius,
-            material: self.material
-        }
-    }
-}
-
-fn get_null_sphere() -> Sphere {
-    Sphere {
-        centre: [0.0; 3],
-        radius: 0.0,
-        material: LambertianMaterial{colour: [1.0; 3]}.into()
-    }
-}
-
-
-/// Mesh Representation
-#[derive(Debug, Clone)]
-pub struct RayTracingMesh<T: graphics::Position + BufferContents + Copy + Clone> {
-    pub mesh: Mesh<T>,
-    pub material: raytrace_shader::RayTracingMaterial
-}
-
-fn get_null_mesh() -> RayTracingMesh<PositionVertex> {
-    let mut mesh = Mesh::new(vec![PositionVertex{position: [0.0; 3]}], vec![0, 0, 0]);
-    mesh.set_normals(vec![Normal{normal: [1.0; 3]}]);
-    RayTracingMesh {
-        mesh: mesh,
-        material: LambertianMaterial{colour: [1.0; 3]}.into()
     }
 }
 

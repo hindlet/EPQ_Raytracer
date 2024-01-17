@@ -7,9 +7,26 @@ use graphics::all_vulkano::{
 use graphics::all_vulkano_utils::{window::{VulkanoWindows, WindowDescriptor}, context::VulkanoConfig};
 use super::{
     diffuse::DiffusePipeline,
-    raytrace_pipeline::{RayTracePipeline, RayTracerSettings},
+    raytrace_pipeline::RayTracePipeline,
     texture_draw_pipeline::RenderPassOverFrame,
 };
+use super::objects::*;
+
+/// Settings to be passed into the raytrace pipeline on creation
+#[derive(Clone, Debug)]
+pub struct RayTracerSettings<T: graphics::Position + BufferContents + Copy + Clone> {
+    pub sample_jitter: Option<f32>,
+    pub num_samples: u32,
+    pub max_bounces: u32,
+    pub use_environment_lighting: bool,
+    
+    pub sphere_data: Vec<Sphere>,
+    pub mesh_data: Vec<RayTracingMesh<T>>,
+
+    pub camera_focal_length: f32,
+    pub viewport_height: f32,
+    pub up: [f32; 3],
+}
 
 
 pub struct RayTracingApp<T: graphics::Position + BufferContents + Copy + Clone> {

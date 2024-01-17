@@ -4,8 +4,11 @@ mod diffuse;
 mod raytrace_pipeline;
 mod raytracing_app;
 mod texture_draw_pipeline;
+mod materials;
+mod objects;
 use raytracing_app::*;
-use raytrace_pipeline::*;
+use materials::*;
+use objects::*;
 
 const IMAGE_SIZE: [u32; 2] = [1080, 720];
 const TARGET_FPS: f32 = 60.0;
