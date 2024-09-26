@@ -21,8 +21,9 @@ fn main() {
 
 
     // let mut app = load_spheres_scene();
-    let mut app = load_box_scene();
+    // let mut app = load_box_scene();
     // let mut app = load_cube_scene();
+    let mut app = load_island_scene();
     // app.camera.controllable();
     
   
@@ -32,10 +33,11 @@ fn main() {
 
     if !REALTIME {
         compute_n_then_render(&mut app, NUM_RENDERS.max(1));
-    }
+    } 
 
     let mut last_frame_time = Instant::now();
     let mut num_rendered = 0;
+    let start_time = Instant::now();
     loop {
         if !handle_events(&mut app, &mut event_loop) {break;}
 
@@ -47,7 +49,7 @@ fn main() {
             
             compute_then_render(&mut app, frame_time);
             num_rendered += 1;
-            if NUM_RENDERS != 0 && num_rendered == NUM_RENDERS {println!("Finished rendering {} frames", NUM_RENDERS)}
+            if NUM_RENDERS != 0 && num_rendered == NUM_RENDERS {println!("Finished rendering {} frames in {} seconds", NUM_RENDERS, start_time.elapsed().as_secs_f32())}
             // println!("{:?}, {:?}", camera.position, camera.direction);
             // if last_frame_time.elapsed().as_secs_f32() > TARGET_FRAME_TIME {println!("Slow frame")}
         }
@@ -273,4 +275,73 @@ fn load_cube_scene() -> RayTracingApp<PositionVertex>{
             up: up.into()
         }
     )
+}
+
+
+#[allow(dead_code)]
+fn load_island_scene() -> RayTracingApp<PositionVertex> {
+    let meshes = load_obj("assets/island.obj");
+    let mesh_data = vec![
+        // Tree
+        RayTracingMesh{
+            mesh: meshes[0].clone(),
+            material: LambertianMaterial{
+                colour: [0.40, 0.26, 0.16],
+                // smoothness: 1.0,
+                // fuzz: 0.0
+            }.into()
+        },
+        // Island
+        RayTracingMesh {
+            mesh: meshes[1].clone(),
+            material: LambertianMaterial{
+                colour: [0.46, 0.46, 0.46]
+            }.into()
+        },
+        // leaves
+        RayTracingMesh {
+            mesh: meshes[2].clone(),
+            material: LambertianMaterial{
+                colour: [0.14, 0.46, 0.18]
+            }.into()
+        },
+        // glowing water
+        RayTracingMesh {
+            mesh: meshes[3].clone(),
+            material: LambertianMaterial {
+                colour: [0.21, 0.63, 0.82]
+            }.into()
+        }
+    ];
+
+
+    let sphere_data = vec![
+        // Sphere {
+        //     centre: [500.0, 100.0, 500.0],
+        //     radius: 250.0,
+        //     material: InvisLightMaterial {
+        //         emission: [0.6, 0.6, 1.0, 25.0]
+        //     }.into()
+        // },
+    ];
+
+
+
+    let cam = Camera::new(Some([-5.0, 10.0, -20.0]), Some([0.2, -0.4, 1.0]), None, None);
+    let up = cam.up;
+    RayTracingApp::new(
+        cam,
+        RayTracerSettings {
+            num_samples: 10,
+            max_bounces: 50,
+            use_environment_lighting: true,
+            sample_jitter: None,
+            sphere_data: sphere_data,
+            mesh_data: mesh_data,
+            camera_focal_length: 1.0,
+            viewport_height: 2.0,
+            up: up.into()
+        }
+    )
+
 }
